@@ -1,94 +1,126 @@
-using System;
+using System.ComponentModel;
 using System.Management;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
-namespace SmartResourceDispatcher.Core
+namespace SmartResourceDispatcher.Core;
+
+internal sealed record PagefileUsage(string Name, uint? AllocatedMiB, uint? CurrentMiB, uint? PeakMiB);
+internal sealed record MemoryCommit(ulong PeakBytes, ulong LimitBytes);
+internal sealed record PhysicalMemory(ulong TotalBytes, ulong AvailableBytes);
+internal sealed record MemorySnapshot(PhysicalMemory Physical, MemoryCommit Commit);
+internal sealed record CrashDumpSettings(int? Mode, bool HasDedicatedFile);
+
+internal static class MemoryAndPagefileManager
 {
-    public record PagefileRecommendation(
-        double InstalledRamGb,
-        int RecommendedMinMb,
-        int RecommendedMaxMb,
-        string Reasoning
-    );
-
-    public class MemoryAndPagefileManager
+    internal static ulong? ReadInstalledRam()
     {
-        public static double GetTotalPhysicalMemoryGb()
+        using var query = new ManagementObjectSearcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
+        using var results = query.Get();
+        foreach (ManagementObject result in results)
         {
-            try
+            using (result)
             {
-                using var searcher = new ManagementObjectSearcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    if (obj["TotalPhysicalMemory"] != null && ulong.TryParse(obj["TotalPhysicalMemory"].ToString(), out ulong bytes))
-                    {
-                        return Math.Round(bytes / (1024.0 * 1024.0 * 1024.0), 2);
-                    }
-                }
-            }
-            catch { }
-
-            return 0;
-        }
-
-        public static void PrintPagefileUsage()
-        {
-            try
-            {
-                using var searcher = new ManagementObjectSearcher("SELECT Name, AllocatedBaseSize, CurrentUsage, PeakUsage FROM Win32_PageFileUsage");
-                bool foundAny = false;
-
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    foundAny = true;
-                    string name = obj["Name"]?.ToString() ?? "Неизвестно";
-                    string allocated = obj["AllocatedBaseSize"]?.ToString() ?? "0";
-                    string current = obj["CurrentUsage"]?.ToString() ?? "0";
-                    string peak = obj["PeakUsage"]?.ToString() ?? "0";
-
-                    Console.WriteLine($"Файл подкачки: {name} | Выделено: {allocated} МБ | Текущее: {current} МБ | Пик: {peak} МБ");
-                }
-
-                if (!foundAny)
-                {
-                    Console.WriteLine("Активные файлы подкачки не обнаружены (возможно, отключены).");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Не удалось прочитать данные файла подкачки: {ex.Message}");
+                if (result["TotalPhysicalMemory"] is ulong bytes && bytes > 0)
+                    return bytes;
             }
         }
 
-        public static PagefileRecommendation GetRecommendation()
-        {
-            double ramGb = GetTotalPhysicalMemoryGb();
-
-            if (ramGb <= 8.5)
-            {
-                return new PagefileRecommendation(
-                    InstalledRamGb: ramGb,
-                    RecommendedMinMb: 4096,
-                    RecommendedMaxMb: 8192,
-                    Reasoning: "При объёме ОЗУ до 8 ГБ нужен запас файла подкачки, чтобы избежать нехватки памяти в тяжёлых приложениях."
-                );
-            }
-
-            if (ramGb <= 16.5)
-            {
-                return new PagefileRecommendation(
-                    InstalledRamGb: ramGb,
-                    RecommendedMinMb: 2048,
-                    RecommendedMaxMb: 4096,
-                    Reasoning: "При 16 ГБ ОЗУ фиксированный небольшой файл подкачки снижает риск скачков при динамическом расширении и оставляет место для дампов."
-                );
-            }
-
-            return new PagefileRecommendation(
-                InstalledRamGb: ramGb,
-                RecommendedMinMb: 1024,
-                RecommendedMaxMb: 2048,
-                Reasoning: "При объёме ОЗУ от 24 ГБ и выше основной объём задач помещается в оперативную память; небольшой файл подкачки нужен для стабильности и системных дампов."
-            );
-        }
+        return null;
     }
+
+    internal static IReadOnlyList<PagefileUsage> ReadPagefiles()
+    {
+        using var query = new ManagementObjectSearcher(
+            "SELECT Name, AllocatedBaseSize, CurrentUsage, PeakUsage FROM Win32_PageFileUsage");
+        using var results = query.Get();
+        var files = new List<PagefileUsage>();
+        foreach (ManagementObject result in results)
+        {
+            using (result)
+            {
+                files.Add(new PagefileUsage(result["Name"] as string ?? "неизвестно",
+                    result["AllocatedBaseSize"] as uint?, result["CurrentUsage"] as uint?,
+                    result["PeakUsage"] as uint?));
+            }
+        }
+
+        return files;
+    }
+
+    internal static MemoryCommit ReadCommit()
+    {
+        var info = ReadPerformanceInformation();
+        return new MemoryCommit((ulong)info.CommitPeak * info.PageSize, (ulong)info.CommitLimit * info.PageSize);
+    }
+
+    internal static MemorySnapshot ReadMemorySnapshot()
+    {
+        var info = ReadPerformanceInformation();
+        return new MemorySnapshot(new PhysicalMemory((ulong)info.PhysicalTotal * info.PageSize, (ulong)info.PhysicalAvailable * info.PageSize),
+            new MemoryCommit((ulong)info.CommitPeak * info.PageSize, (ulong)info.CommitLimit * info.PageSize));
+    }
+
+    private static PerformanceInformation ReadPerformanceInformation()
+    {
+        uint size = (uint)Marshal.SizeOf<PerformanceInformation>();
+        if (!GetPerformanceInfo(out var info, size))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        return info;
+    }
+
+    internal static CrashDumpSettings ReadCrashDumpSettings()
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\CrashControl");
+        int? mode = key?.GetValue("CrashDumpEnabled") as int?;
+        if (mode == 1 && key?.GetValue("FilterPages") is 1)
+            mode = 10;
+
+        bool dedicated = key?.GetValue("DedicatedDumpFile") is string path && !string.IsNullOrWhiteSpace(path);
+        return new CrashDumpSettings(mode, dedicated);
+    }
+
+    internal static string ExplainManualSizing(ulong? ramBytes, MemoryCommit? commit, CrashDumpSettings? dump)
+    {
+        const ulong mib = 1024 * 1024;
+        var notes = new List<string>();
+        if (ramBytes is > 0 && commit is not null)
+        {
+            ulong workloadBytes = commit.PeakBytes > ramBytes.Value ? commit.PeakBytes - ramBytes.Value : 0;
+            notes.Add($"По пику с последней загрузки сверх ОЗУ потребовалось около {(workloadBytes + mib - 1) / mib} МиБ. Это оценка без запаса на будущую нагрузку.");
+        }
+        else
+        {
+            notes.Add("Для расчёта вручную нужны объём ОЗУ и пиковая выделенная память под типичной нагрузкой.");
+        }
+
+        if (dump is { HasDedicatedFile: true })
+            notes.Add("Для дампов указан отдельный файл. Проверьте его доступность и размер.");
+        else
+            notes.Add(dump?.Mode switch
+            {
+                0 => "Системные дампы отключены.",
+                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} МиБ.",
+                1 => "Для полного дампа нужен объём ОЗУ плюс 257 МиБ.",
+                3 => "Для малого дампа нужен минимум 1 МиБ.",
+                2 or 7 or 10 => "Точный минимум для выбранного системного дампа зависит от его объёма.",
+                _ => "Режим системных дампов неизвестен. Проверьте его перед ручной настройкой."
+            });
+
+        return string.Join(Environment.NewLine, notes);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PerformanceInformation
+    {
+        public uint Size;
+        public nuint CommitTotal, CommitLimit, CommitPeak, PhysicalTotal, PhysicalAvailable;
+        public nuint SystemCache, KernelTotal, KernelPaged, KernelNonpaged, PageSize;
+        public uint HandleCount, ProcessCount, ThreadCount;
+    }
+
+    [DllImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetPerformanceInfo(out PerformanceInformation information, uint size);
 }

@@ -8,8 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="System.Management" Version="11.0.0" />
+    <Compile Remove="Tests/**/*.cs" />
+    <Compile Remove="Desktop/**/*.cs" />
+    <InternalsVisibleTo Include="SmartResourceDispatcher.Checks" />
+    <InternalsVisibleTo Include="CoreShift.Desktop" />
   </ItemGroup>
 
 </Project>
