@@ -1,0 +1,42 @@
+# Артефакты сборки .NET / C#
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Публикация и пакеты
+[Pp]ublishProfiles/
+*.pubxml
+*.nupkg
+*.snk
+
+# Временные файлы и кэш сборки
+*.cache
+*.il
+*.mdb
+*.pdb
+*.aps
+*.ide
+*.csproj.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.user
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Кэш Visual Studio, VS Code и Zed
+.vs/
+.vscode/
+.zed/
+.idea/
+
+# Файлы ОС Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
