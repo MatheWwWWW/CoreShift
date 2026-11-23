@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net11.0-windows7.0": {
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "8x+8Jt/ASauIThRh7yT+kwiR7xmWbPMtTJ3p36EalBuOQZsq6NCqVejO3tlXaYQGb337zOATzrBqAzLgLa86Cg=="
+      },
+      "smartresourcedispatcher": {
+        "type": "Project",
+        "dependencies": {
+          "System.Management": "[11.0.0, )"
+        }
+      }
+    }
+  }
+}
