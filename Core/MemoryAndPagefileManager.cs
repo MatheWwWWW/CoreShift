@@ -88,7 +88,7 @@ internal static class MemoryAndPagefileManager
         if (ramBytes is > 0 && commit is not null)
         {
             ulong workloadBytes = commit.PeakBytes > ramBytes.Value ? commit.PeakBytes - ramBytes.Value : 0;
-            notes.Add($"По пику с последней загрузки сверх ОЗУ потребовалось около {(workloadBytes + mib - 1) / mib} МиБ. Это оценка без запаса на будущую нагрузку.");
+            notes.Add($"По пику с последней загрузки сверх ОЗУ потребовалось около {(workloadBytes + mib - 1) / mib} Mb. Это оценка без запаса на будущую нагрузку.");
         }
         else
         {
@@ -101,9 +101,9 @@ internal static class MemoryAndPagefileManager
             notes.Add(dump?.Mode switch
             {
                 0 => "Системные дампы отключены.",
-                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} МиБ.",
-                1 => "Для полного дампа нужен объём ОЗУ плюс 257 МиБ.",
-                3 => "Для малого дампа нужен минимум 1 МиБ.",
+                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} Mb.",
+                1 => "Для полного дампа нужен объём ОЗУ плюс 257 Mb.",
+                3 => "Для малого дампа нужен минимум 1 Mb.",
                 2 or 7 or 10 => "Точный минимум для выбранного системного дампа зависит от его объёма.",
                 _ => "Режим системных дампов неизвестен. Проверьте его перед ручной настройкой."
             });

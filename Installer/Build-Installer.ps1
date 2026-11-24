@@ -3,12 +3,16 @@ param(
     [string] $DotNet = 'dotnet',
     [string] $InnoCompiler,
     [ValidatePattern('^[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}$')]
-    [string] $Version = '1.0.0',
+    [string] $Version,
     [string[]] $PackageSource
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $Version) {
+    $desktopProject = [xml](Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'Desktop\CoreShift.Desktop.csproj'))
+    $Version = $desktopProject.Project.PropertyGroup.Version
+}
 $dotNetExe = (Get-Command -Name $DotNet -CommandType Application).Source
 $sources = foreach ($source in $PackageSource) {
     if (Test-Path -LiteralPath $source) { (Resolve-Path -LiteralPath $source).Path }

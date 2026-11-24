@@ -87,7 +87,7 @@ static T? ReadDiagnostic<T>(Func<T> read)
     }
 }
 
-static string Size(uint? mib) => mib.HasValue ? $"{mib} МиБ" : "неизвестно";
+static string Size(uint? mib) => mib.HasValue ? $"{mib} Mb" : "неизвестно";
 
 static int Clean(bool apply)
 {

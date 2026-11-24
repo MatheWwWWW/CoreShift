@@ -3,15 +3,19 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Principal;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using SmartResourceDispatcher.Core;
+using Tray = System.Windows.Forms;
 
 namespace CoreShift.Desktop;
 
@@ -36,6 +40,11 @@ public partial class MainWindow : Window
     }
 
     private readonly bool isElevated;
+    private readonly Tray.NotifyIcon trayIcon;
+    private readonly Tray.ContextMenuStrip trayMenu = new();
+    private readonly System.Drawing.Icon? appIcon;
+    private readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
+    private readonly CancellationTokenSource updateLifetime = new();
     private readonly HashSet<Task> pendingOperations = [];
     private readonly ObservableCollection<string> profileEvents = [];
     private CleanPreview? lastScan;
@@ -47,6 +56,10 @@ public partial class MainWindow : Window
     private bool loadingProfileApplications;
     private bool closing;
     private bool allowClose;
+    private bool initialized;
+    private bool checkingUpdate;
+    private bool installingUpdate;
+    private AppRelease? availableUpdate;
 
     public MainWindow()
     {
@@ -71,9 +84,117 @@ public partial class MainWindow : Window
         isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
         ProfileEvents.ItemsSource = profileEvents;
+
+        if (Environment.ProcessPath is { } exePath)
+            appIcon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+        trayMenu.Items.Add("Открыть CoreShift", null, (_, _) => ShowFromTray());
+        trayMenu.Items.Add("Выход", null, async (_, _) => await ExitAsync());
+        trayIcon = new Tray.NotifyIcon
+        {
+            Icon = appIcon ?? System.Drawing.SystemIcons.Application,
+            Text = "CoreShift",
+            ContextMenuStrip = trayMenu,
+            Visible = true
+        };
+        trayIcon.MouseClick += (_, e) =>
+        {
+            if (e.Button == Tray.MouseButtons.Left)
+                ShowFromTray();
+        };
+        updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e) => await RefreshOverviewAsync();
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (initialized)
+            return;
+
+        initialized = true;
+        if (AppUpdater.IsInstalledCopy())
+        {
+            updateTimer.Start();
+            await Task.WhenAll(RefreshOverviewAsync(), CheckForUpdatesAsync());
+            return;
+        }
+
+        await RefreshOverviewAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        if (checkingUpdate || installingUpdate || closing)
+            return;
+
+        checkingUpdate = true;
+        try
+        {
+            var update = await AppUpdater.FetchLatestAsync(updateLifetime.Token);
+            if (closing || installingUpdate || update?.Version == availableUpdate?.Version)
+                return;
+
+            availableUpdate = update;
+            UpdateBanner.Visibility = VisibleWhen(update is not null);
+            if (update is not null)
+                SetStatus(UpdateStatus, $"Версия {update.Version}");
+        }
+        catch (Exception ex) when (IsUpdateError(ex))
+        {
+            Debug.WriteLine(ex);
+        }
+        finally
+        {
+            checkingUpdate = false;
+        }
+    }
+
+    private async void InstallUpdateClick(object sender, RoutedEventArgs e)
+    {
+        if (availableUpdate is not { } update || installingUpdate || closing)
+            return;
+
+        installingUpdate = true;
+        InstallUpdateButton.IsEnabled = false;
+        SetStatus(UpdateStatus, $"Загружаем версию {update.Version}…");
+        string? installerPath = null;
+        bool preparingExit = false;
+        bool launched = false;
+        try
+        {
+            installerPath = AppUpdater.CreateInstallerPath();
+            using var installer = await AppUpdater.DownloadAsync(update, installerPath, updateLifetime.Token);
+            if (closing)
+                return;
+
+            SetStatus(UpdateStatus, "Завершаем операции перед установкой…");
+            preparingExit = true;
+            if (!await PrepareToExitAsync())
+            {
+                SetStatus(UpdateStatus, "Не удалось восстановить приоритет процесса. Повторите установку после проверки профиля.", error: true);
+                return;
+            }
+
+            AppUpdater.LaunchInstaller(installer.Name);
+            launched = true;
+            CloseForExit();
+        }
+        catch (Exception ex) when (IsUpdateError(ex))
+        {
+            Debug.WriteLine(ex);
+            if (!updateLifetime.IsCancellationRequested)
+            {
+                if (preparingExit && closing)
+                    CancelExit();
+                SetStatus(UpdateStatus, "Не удалось подготовить обновление. Нажмите «Установить», чтобы повторить.", error: true);
+            }
+        }
+        finally
+        {
+            if (!launched && installerPath is not null)
+                AppUpdater.TryDeleteInstaller(installerPath);
+            installingUpdate = false;
+            InstallUpdateButton.IsEnabled = true;
+        }
+    }
 
     private async void Navigate(object sender, RoutedEventArgs e)
     {
@@ -655,15 +776,36 @@ public partial class MainWindow : Window
         finally { pendingOperations.Remove(task); }
     }
 
-    private async void OnClosing(object? sender, CancelEventArgs e)
+    private void OnClosing(object? sender, CancelEventArgs e)
     {
-        if (allowClose || (!closing && pendingOperations.Count == 0 && profileTask is null))
+        if (allowClose)
             return;
 
         e.Cancel = true;
-        if (closing)
+        if (!closing)
+            Hide();
+    }
+
+    internal void ShowFromTray()
+    {
+        if (closing || allowClose)
             return;
 
+        if (!IsVisible)
+            Show();
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private async Task ExitAsync()
+    {
+        if (!closing && await PrepareToExitAsync())
+            CloseForExit();
+    }
+
+    private async Task<bool> PrepareToExitAsync()
+    {
         closing = true;
         WindowSurface.IsEnabled = false;
         profileStop?.Cancel();
@@ -684,17 +826,44 @@ public partial class MainWindow : Window
             }
         }
 
-        if (!restored)
-        {
-            WindowSurface.IsEnabled = true;
-            closing = false;
-            ProfileNav.IsChecked = true;
-            Activate();
-            return;
-        }
+        if (restored)
+            return true;
 
+        CancelExit();
+        ProfileNav.IsChecked = true;
+        return false;
+    }
+
+    private void CancelExit()
+    {
+        WindowSurface.IsEnabled = true;
+        closing = false;
+        ShowFromTray();
+    }
+
+    private void CloseForExit()
+    {
         allowClose = true;
-        await Dispatcher.InvokeAsync(Close);
+        Close();
+    }
+
+    internal void PrepareForSessionEnd()
+    {
+        allowClose = true;
+        profileStop?.Cancel();
+        try { profileTask?.Wait(TimeSpan.FromSeconds(2)); }
+        catch (AggregateException ex) { Debug.WriteLine(ex); }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        updateTimer.Stop();
+        updateLifetime.Cancel();
+        updateLifetime.Dispose();
+        trayIcon.Dispose();
+        trayMenu.Dispose();
+        appIcon?.Dispose();
+        base.OnClosed(e);
     }
 
     private void MinimizeClick(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
@@ -725,6 +894,9 @@ public partial class MainWindow : Window
 
     private static bool IsSystemError(Exception ex) => ex is ArgumentException or InvalidOperationException
         or IOException or UnauthorizedAccessException or SecurityException or Win32Exception or ManagementException or COMException;
+
+    private static bool IsUpdateError(Exception ex) => IsSystemError(ex)
+        || ex is HttpRequestException or JsonException or InvalidDataException or OperationCanceledException;
 
     private static string FormatBytes(ulong? bytes) => bytes is { } value ? DiskCleaner.FormatBytes((long)value) : "—";
     private static string FormatMiB(uint? mib) => FormatBytes(mib is { } value ? (ulong)value * 1024 * 1024 : null);

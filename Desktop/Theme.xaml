@@ -203,6 +203,61 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <Style x:Key="CleanupOption" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="Margin" Value="4" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusCue}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Border x:Name="Card" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
+                            BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Indicator" Width="18" Height="18" Margin="0,1,10,0"
+                                    VerticalAlignment="Top" CornerRadius="4" BorderThickness="1"
+                                    BorderBrush="{StaticResource Muted}">
+                                <Path x:Name="CheckMark" Data="M 1,5 L 4,8 L 10,2" Width="11" Height="9"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"
+                                      Stroke="{StaticResource Canvas}" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{TemplateBinding Content}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Path=(AutomationProperties.HelpText), RelativeSource={RelativeSource TemplatedParent}}"
+                                           Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Card" Property="Background" Value="{StaticResource Raised}" />
+                            <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource Muted}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Card" Property="Background" Value="#232B20" />
+                            <Setter TargetName="Card" Property="BorderBrush" Value="#61783D" />
+                            <Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Card" Property="Opacity" Value=".8" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Card" Property="Opacity" Value=".6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <Style TargetType="TextBox">
         <Setter Property="Foreground" Value="{StaticResource Text}" />
         <Setter Property="Background" Value="{StaticResource Canvas}" />

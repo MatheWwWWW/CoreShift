@@ -13,6 +13,7 @@
     <Grid x:Name="WindowSurface" Background="{StaticResource Canvas}">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -34,30 +35,51 @@
                             AutomationProperties.Name="Развернуть" Click="MaximizeClick">
                         <Path x:Name="MaximizeGlyph" Data="M 0,0 H 9 V 9 H 0 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
-                    <Button Style="{StaticResource CloseTitleButton}" ToolTip="Закрыть" AutomationProperties.Name="Закрыть" Click="CloseClick">
+                    <Button Style="{StaticResource CloseTitleButton}" ToolTip="Свернуть в трей"
+                            AutomationProperties.Name="Свернуть в трей" Click="CloseClick">
                         <Path Data="M 0,0 L 9,9 M 9,0 L 0,9" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Border x:Name="UpdateBanner" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource Panel}"
+                BorderBrush="{StaticResource Accent}" BorderThickness="0,0,0,1" Padding="20,10">
+            <DockPanel>
+                <Button x:Name="InstallUpdateButton" DockPanel.Dock="Right" Content="Установить"
+                        Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Margin="16,0,0,0"
+                        Click="InstallUpdateClick" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Вышла новая версия приложения" FontWeight="SemiBold" />
+                    <TextBlock x:Name="UpdateStatus" Style="{StaticResource SecondaryText}" Margin="0,3,0,0"
+                               AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="204" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Border Background="{StaticResource Rail}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="15,23,15,20">
-                    <Border DockPanel.Dock="Bottom" Background="#1B1D25" BorderBrush="{StaticResource Line}"
-                            BorderThickness="1" CornerRadius="10" Padding="11,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" Fill="{StaticResource Violet}" Margin="0,6,9,0" VerticalAlignment="Top" />
-                            <StackPanel>
-                                <TextBlock Text="Доступ Windows" FontSize="12" FontWeight="SemiBold" />
-                                <TextBlock x:Name="AccessMode" Style="{StaticResource SecondaryText}" FontSize="11" Margin="0,3,0,0" />
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <Button x:Name="SidebarUpdateButton" Content="Обновить" Style="{StaticResource PrimaryButton}"
+                                Margin="0,0,0,8" AutomationProperties.Name="Обновить CoreShift" Click="InstallUpdateClick"
+                                Visibility="{Binding Visibility, ElementName=UpdateBanner}"
+                                IsEnabled="{Binding IsEnabled, ElementName=InstallUpdateButton}" />
+                        <Border Background="#1B1D25" BorderBrush="{StaticResource Line}"
+                                BorderThickness="1" CornerRadius="10" Padding="11,10">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource Violet}" Margin="0,6,9,0" VerticalAlignment="Top" />
+                                <StackPanel>
+                                    <TextBlock Text="Доступ Windows" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="AccessMode" Style="{StaticResource SecondaryText}" FontSize="11" Margin="0,3,0,0" />
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
                     <StackPanel>
                         <RadioButton x:Name="OverviewNav" Content="Обзор" Tag="{StaticResource OverviewIcon}"
                                      GroupName="Navigation" IsChecked="True" Style="{StaticResource NavButton}" Checked="Navigate" />
@@ -272,33 +294,30 @@
 
                     <StackPanel x:Name="CleanPage" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource PageTitle}" Text="Очистка Temp" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Предпросмотр перед удалением: Temp и обычные кэши старше 24 часов, файлы отчётов Windows старше 30 дней." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="Перед удалением вы увидите список файлов. Занятые файлы пропускаются." Margin="0,4,0,17" />
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <WrapPanel x:Name="CleanCategoryChoices">
-                                    <CheckBox x:Name="CleanTemp" Content="Папки Temp (пользовательская и системная)" IsChecked="True"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                <UniformGrid x:Name="CleanCategoryChoices" Columns="2" Margin="-4,-4,-4,12">
+                                    <UniformGrid.Resources>
+                                        <Style TargetType="CheckBox" BasedOn="{StaticResource CleanupOption}" />
+                                    </UniformGrid.Resources>
+                                    <CheckBox x:Name="CleanTemp" Content="Папки Temp" IsChecked="True"
+                                              AutomationProperties.HelpText="Временные файлы Windows и приложений старше суток." />
                                     <CheckBox x:Name="CleanThumbnails" Content="Миниатюры Проводника"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                              AutomationProperties.HelpText="Эскизы файлов. Проводник создаст их снова." />
                                     <CheckBox x:Name="CleanIcons" Content="Кэш иконок"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                              AutomationProperties.HelpText="Сохранённые значки. Проводник создаст их снова." />
                                     <CheckBox x:Name="CleanDirectX" Content="Кэш шейдеров DirectX"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                              AutomationProperties.HelpText="Кэш графики DirectX. Первый запуск игр может замедлиться." />
                                     <CheckBox x:Name="CleanNvidia" Content="Кэш шейдеров NVIDIA"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                              AutomationProperties.HelpText="Кэш графики NVIDIA. Первый запуск игр может замедлиться." />
                                     <CheckBox x:Name="CleanWerArchive" Content="Архив отчётов Windows"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                              AutomationProperties.HelpText="Сохранённые отчёты о сбоях старше 30 дней." />
                                     <CheckBox x:Name="CleanWerQueue" Content="Очередь отчётов Windows"
-                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
-                                    <CheckBox x:Name="CleanFontCache" Content="Кэш шрифтов (диагностика)"
-                                              Foreground="{StaticResource Text}" Margin="0,0,0,8" />
-                                </WrapPanel>
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
-                                           Text="Занятые файлы пропускаются. Windows пересоздаст кэши Проводника. После очистки кэшей шейдеров DirectX или NVIDIA первые запуски игр могут подтормаживать, пока шейдеры компилируются заново." />
-                                <TextBlock Style="{StaticResource SecondaryText}" Foreground="{StaticResource Warning}" Margin="0,0,0,12"
-                                           Text="В очереди могут быть ещё не отправленные отчёты. Удаление не позволит Windows отправить эти данные." />
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
-                                           Text="Кэш шрифтов очищайте только при проблемах с отображением текста. Могут понадобиться права администратора. CoreShift не останавливает службы и пропускает файлы, которые они используют." />
+                                              AutomationProperties.HelpText="Отчёты старше 30 дней. Неотправленные будут потеряны." />
+                                    <CheckBox x:Name="CleanFontCache" Content="Кэш шрифтов"
+                                              AutomationProperties.HelpText="Для проблем со шрифтами. Могут понадобиться права администратора." />
+                                </UniformGrid>
                                 <WrapPanel>
                                     <Button x:Name="ScanButton" Content="Сканировать" Style="{StaticResource PrimaryButton}" Click="ScanClick" Margin="0,0,8,0" />
                                     <Button x:Name="DeleteButton" Content="Удалить найденное" IsEnabled="False" Click="DeleteClick" />
