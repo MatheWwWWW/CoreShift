@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         string Advice, bool HasErrors);
 
     private sealed record PagefileRow(string Name, string Usage);
+    private sealed record PcInfoRow(string Label, string Value);
     private sealed record CleanRow(string Path, string Size);
     private sealed record TweakRow(WindowsTweak Tweak, string State, bool CanApply, bool CanRestore)
     {
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     private TempScanReport? lastScan;
     private CancellationTokenSource? profileStop;
     private Task<bool>? profileTask;
+    private bool loadingPcInfo;
     private bool loadingTweaks;
     private bool closing;
     private bool allowClose;
@@ -57,6 +59,7 @@ public partial class MainWindow : Window
             return;
 
         OverviewPage.Visibility = VisibleWhen(ReferenceEquals(sender, OverviewNav));
+        PcInfoPage.Visibility = VisibleWhen(ReferenceEquals(sender, PcInfoNav));
         MemoryPage.Visibility = VisibleWhen(ReferenceEquals(sender, MemoryNav));
         CleanPage.Visibility = VisibleWhen(ReferenceEquals(sender, CleanNav));
         TweaksPage.Visibility = VisibleWhen(ReferenceEquals(sender, TweaksNav));
@@ -65,9 +68,71 @@ public partial class MainWindow : Window
 
         if (ReferenceEquals(sender, TweaksNav) && !loadingTweaks)
             await RefreshTweaksAsync();
+        else if (ReferenceEquals(sender, PcInfoNav) && !loadingPcInfo && PcInfoItems.ItemsSource is null)
+            await LoadPcInfoAsync();
     }
 
     private static Visibility VisibleWhen(bool condition) => condition ? Visibility.Visible : Visibility.Collapsed;
+
+    private async Task LoadPcInfoAsync()
+    {
+        loadingPcInfo = true;
+        try
+        {
+            PcInfoItems.ItemsSource = await RunInBackground(ReadPcInfo);
+            PcInfoStatus.Visibility = Visibility.Collapsed;
+        }
+        finally
+        {
+            loadingPcInfo = false;
+        }
+    }
+
+    private static PcInfoRow[] ReadPcInfo()
+    {
+        const string unavailable = "Недоступно";
+        string windows = ReadWmiValues("SELECT Caption FROM Win32_OperatingSystem", item => item["Caption"] as string)
+            ?? "Windows";
+
+        return
+        [
+            new("Имя компьютера", Environment.MachineName),
+            new("Операционная система", $"{windows} · сборка {Environment.OSVersion.Version.Build} · {RuntimeInformation.OSArchitecture}"),
+            new("Процессоры", ReadWmiValues("SELECT Name FROM Win32_Processor", item => item["Name"] as string) ?? unavailable),
+            new("Оперативная память", ReadWmiValues("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem",
+                item => item["TotalPhysicalMemory"] is ulong bytes && bytes > 0 ? FormatBytes(bytes) : null) ?? unavailable),
+            new("Видеоадаптеры", ReadWmiValues("SELECT Name FROM Win32_VideoController", item => item["Name"] as string) ?? unavailable),
+            new("Накопители", ReadWmiValues("SELECT Model, Size FROM Win32_DiskDrive", item =>
+            {
+                string? model = (item["Model"] as string)?.Trim();
+                return item["Size"] is ulong bytes && bytes > 0
+                    ? $"{(string.IsNullOrEmpty(model) ? "Накопитель" : model)} · {FormatBytes(bytes)}"
+                    : model;
+            }) ?? unavailable)
+        ];
+    }
+
+    private static string? ReadWmiValues(string query, Func<ManagementBaseObject, string?> format)
+    {
+        var values = new List<string>();
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(query);
+            using var results = searcher.Get();
+            foreach (ManagementBaseObject item in results)
+            {
+                using (item)
+                    if (format(item)?.Trim() is { Length: > 0 } value)
+                        values.Add(value);
+            }
+        }
+        catch (Exception ex) when (IsSystemError(ex))
+        {
+            return null;
+        }
+
+        return values.Count == 0 ? null : string.Join(Environment.NewLine, values);
+    }
 
     private void OpenCleanClick(object sender, RoutedEventArgs e) => CleanNav.IsChecked = true;
     private void OpenProfileClick(object sender, RoutedEventArgs e) => ProfileNav.IsChecked = true;

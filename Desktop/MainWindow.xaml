@@ -61,6 +61,8 @@
                     <StackPanel>
                         <RadioButton x:Name="OverviewNav" Content="Обзор" Tag="{StaticResource OverviewIcon}"
                                      GroupName="Navigation" IsChecked="True" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <RadioButton x:Name="PcInfoNav" Content="О компьютере" Tag="{StaticResource PcInfoIcon}"
+                                     GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
                         <RadioButton x:Name="MemoryNav" Content="Память" Tag="{StaticResource MemoryIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
                         <RadioButton x:Name="CleanNav" Content="Очистка" Tag="{StaticResource CleanIcon}"
@@ -216,6 +218,31 @@
                                 </StackPanel>
                             </Border>
                         </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PcInfoPage" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="О компьютере" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="Сведения о Windows и оборудовании." Margin="0,4,0,17" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}"
+                                           Text="Получаем сведения о компьютере…" AutomationProperties.LiveSetting="Polite" />
+                                <ItemsControl x:Name="PcInfoItems">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="160" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Style="{StaticResource SecondaryText}" Text="{Binding Label}" Margin="0,0,14,0" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel x:Name="MemoryPage" Visibility="Collapsed">

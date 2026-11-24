@@ -28,6 +28,12 @@
 * **Пакеты NuGet**: `CommunityToolkit.Mvvm`, `System.Management`
 * **Редакторы / среда**: VS Code / Zed, PowerShell, Git
 
+## Графический интерфейс CoreShift
+
+Запуск на Windows: `dotnet run --project Desktop/CoreShift.Desktop.csproj`.
+
+Вкладка **«О компьютере»** показывает имя ПК, версию и архитектуру Windows, процессоры, объём ОЗУ, видеоадаптеры и накопители. Сведения загружаются при первом открытии вкладки. Если Windows не вернула отдельную характеристику, она отмечается как недоступная.
+
 ## Запуск и сборка
 
 В терминале из папки проекта (`SmartResourceDispatcher`):
