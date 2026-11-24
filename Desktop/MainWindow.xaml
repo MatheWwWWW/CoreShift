@@ -333,6 +333,16 @@
                                 </ListBox>
                             </StackPanel>
                         </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Файлы обновлений Windows" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,8,0,12"
+                                           Text="В параметрах хранилища откройте «Временные файлы» и выберите «Очистка обновлений Windows», если она доступна. Windows сама определяет, какие файлы обновлений можно удалить." />
+                                <Button Content="Открыть параметры хранилища" HorizontalAlignment="Left" Click="OpenWindowsStorageClick" />
+                                <TextBlock x:Name="WindowsStorageStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
+                                           Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel x:Name="TweaksPage" Visibility="Collapsed">

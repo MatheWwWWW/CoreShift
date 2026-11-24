@@ -429,6 +429,20 @@ public partial class MainWindow : Window
         CleanDetails.ItemsSource = null;
     }
 
+    private void OpenWindowsStorageClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("ms-settings:storagesense") { UseShellExecute = true });
+            WindowsStorageStatus.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex) when (IsSystemError(ex))
+        {
+            SetStatus(WindowsStorageStatus, "Не удалось открыть хранилище. Откройте «Параметры → Система → Память» вручную.", error: true);
+            WindowsStorageStatus.Visibility = Visibility.Visible;
+        }
+    }
+
     private async Task RefreshTweaksAsync()
     {
         loadingTweaks = true;
