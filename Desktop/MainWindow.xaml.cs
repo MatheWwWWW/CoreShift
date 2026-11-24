@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private sealed record CleanRow(string Path, string Size);
     private sealed record CleanCategoryRow(string Heading, string Roots, string Skipped);
     private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories, long TotalBytes);
+    private sealed record ProfileApplicationRow(string ProcessName, string Label);
     private sealed record TweakRow(WindowsTweak Tweak, string State, bool CanApply, bool CanRestore)
     {
         public string Name => Tweak.Name;
@@ -42,6 +43,7 @@ public partial class MainWindow : Window
     private Task<bool>? profileTask;
     private bool loadingPcInfo;
     private bool loadingTweaks;
+    private bool loadingProfileApplications;
     private bool closing;
     private bool allowClose;
 
@@ -79,6 +81,8 @@ public partial class MainWindow : Window
             await RefreshTweaksAsync();
         else if (ReferenceEquals(sender, PcInfoNav) && !loadingPcInfo && PcInfoItems.ItemsSource is null)
             await LoadPcInfoAsync();
+        else if (ReferenceEquals(sender, ProfileNav))
+            await RefreshProfileApplicationsAsync();
     }
 
     private static Visibility VisibleWhen(bool condition) => condition ? Visibility.Visible : Visibility.Collapsed;
@@ -467,23 +471,81 @@ public partial class MainWindow : Window
             await RefreshTweaksAsync();
     }
 
+    private async void RefreshProfileApplicationsClick(object sender, RoutedEventArgs e) =>
+        await RefreshProfileApplicationsAsync();
+
+    private async Task RefreshProfileApplicationsAsync()
+    {
+        if (loadingProfileApplications || profileStop is not null)
+            return;
+
+        var selected = ProfileApplication.SelectedItem as ProfileApplicationRow;
+        loadingProfileApplications = true;
+        UpdateProfileControls();
+        ProfileApplicationStatus.Visibility = Visibility.Visible;
+        SetStatus(ProfileApplicationStatus, "Получаем список открытых приложений…");
+        try
+        {
+            var applications = await RunInBackground(ReadProfileApplications);
+            ProfileApplication.ItemsSource = applications;
+            ProfileApplication.SelectedItem = applications.FirstOrDefault(app =>
+                string.Equals(app.ProcessName, selected?.ProcessName, StringComparison.OrdinalIgnoreCase));
+            ProfileApplicationStatus.Visibility = VisibleWhen(applications.Length == 0);
+            if (applications.Length == 0)
+                SetStatus(ProfileApplicationStatus, "Откройте нужное приложение и нажмите «Обновить».");
+        }
+        catch (Exception ex) when (IsSystemError(ex))
+        {
+            SetStatus(ProfileApplicationStatus, "Не удалось получить список приложений. Нажмите «Обновить».", error: true);
+        }
+        finally
+        {
+            loadingProfileApplications = false;
+            UpdateProfileControls();
+        }
+    }
+
+    private static ProfileApplicationRow[] ReadProfileApplications()
+    {
+        var applications = new Dictionary<string, ProfileApplicationRow>(StringComparer.OrdinalIgnoreCase);
+        foreach (var process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                try
+                {
+                    if (process.Id <= 4 || process.Id == Environment.ProcessId || process.MainWindowHandle == 0)
+                        continue;
+
+                    string name = process.ProcessName;
+                    string title = process.MainWindowTitle.Trim();
+                    string label = title.Length > 0 ? $"{name}.exe — {title}" : $"{name}.exe";
+                    applications.TryAdd(name, new ProfileApplicationRow(name, label));
+                }
+                catch (Exception ex) when (IsSystemError(ex))
+                {
+                    // A process can exit or become inaccessible while the list is being read.
+                }
+            }
+        }
+
+        return applications.Values.OrderBy(app => app.Label, StringComparer.CurrentCultureIgnoreCase).ToArray();
+    }
+
+    private void ProfileApplicationChanged(object sender, SelectionChangedEventArgs e) => UpdateProfileControls();
+
     private async void StartProfileClick(object sender, RoutedEventArgs e)
     {
-        string name;
-        try { name = ContextProfileManager.NormalizeProcessName(ProfileProcess.Text.Trim()); }
-        catch (ArgumentException ex)
-        {
-            SetStatus(ProfileStatus, ex.Message, error: true);
-            ProfileProcess.Focus();
+        if (loadingProfileApplications || profileStop is not null || ProfileApplication.SelectedItem is not ProfileApplicationRow app)
             return;
-        }
 
         var priority = AbovePriority.IsChecked == true ? ProcessPriorityClass.AboveNormal
             : NormalPriority.IsChecked == true ? ProcessPriorityClass.Normal : ProcessPriorityClass.BelowNormal;
+        string name = app.ProcessName;
         var profile = new ContextProfileManager(name, priority);
         using var stop = new CancellationTokenSource();
         profileStop = stop;
-        SetProfileControls(running: true);
+        UpdateProfileControls();
         profileEvents.Clear();
         SetStatus(ProfileStatus, "Запускаем наблюдение…");
 
@@ -516,7 +578,7 @@ public partial class MainWindow : Window
         {
             profileStop = null;
             profileTask = null;
-            SetProfileControls(running: false);
+            UpdateProfileControls();
         }
     }
 
@@ -527,12 +589,15 @@ public partial class MainWindow : Window
         profileStop?.Cancel();
     }
 
-    private void SetProfileControls(bool running)
+    private void UpdateProfileControls()
     {
-        StartProfileButton.IsEnabled = !running;
-        ProfileProcess.IsEnabled = !running;
+        bool running = profileStop is not null;
+        bool canChoose = !running && !loadingProfileApplications;
+        StartProfileButton.IsEnabled = canChoose && ProfileApplication.SelectedItem is ProfileApplicationRow;
+        ProfileApplication.IsEnabled = canChoose && ProfileApplication.HasItems;
+        RefreshProfileApplicationsButton.IsEnabled = canChoose;
         PriorityChoices.IsEnabled = !running;
-        StopProfileButton.IsEnabled = running;
+        StopProfileButton.IsEnabled = profileStop is { IsCancellationRequested: false };
     }
 
     private bool Confirm(string title, string message, string action) =>

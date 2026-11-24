@@ -228,6 +228,89 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <Style x:Key="ProfileApplicationPicker" TargetType="ComboBox">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="Background" Value="{StaticResource Canvas}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusCue}" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="MaxDropDownHeight" Value="288" />
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="Foreground" Value="{StaticResource Text}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ComboBoxItem">
+                                <Border x:Name="Row" Background="Transparent" Padding="11,8">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Row" Property="Background" Value="#282D3E" />
+                                    </Trigger>
+                                    <Trigger Property="IsHighlighted" Value="True">
+                                        <Setter TargetName="Row" Property="Background" Value="#303442" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid x:Name="Chrome">
+                        <ToggleButton Focusable="False" ClickMode="Press" Cursor="Hand"
+                                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                      Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="1" CornerRadius="8">
+                                        <Path Data="M 0,0 L 4,4 L 8,0" Stroke="{StaticResource Muted}" StrokeThickness="1.5"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource Violet}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource Violet}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          VerticalAlignment="Center" Margin="11,0,32,0" IsHitTestVisible="False" />
+                        <TextBlock x:Name="Placeholder" Text="Выберите приложение" Foreground="{StaticResource Muted}"
+                                   VerticalAlignment="Center" Margin="11,0,32,0" IsHitTestVisible="False" Visibility="Collapsed" />
+                        <Popup x:Name="PART_Popup" Placement="Bottom" VerticalOffset="4" AllowsTransparency="True"
+                               IsOpen="{TemplateBinding IsDropDownOpen}">
+                            <Border Width="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                    Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}"
+                                    BorderThickness="1" CornerRadius="8" Padding="0,4">
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="SelectedIndex" Value="-1">
+                            <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value=".6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <Style TargetType="ToolTip">
         <Setter Property="Background" Value="{StaticResource Raised}" />
         <Setter Property="Foreground" Value="{StaticResource Text}" />
