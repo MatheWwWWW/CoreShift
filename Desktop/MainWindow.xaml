@@ -335,9 +335,27 @@
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Приложение и приоритет" />
-                                <Label Content="Имя процесса, например notepad.exe" Target="{Binding ElementName=ProfileProcess}"
+                                <Label Content="Открытое приложение" Target="{Binding ElementName=ProfileApplication}"
                                        Foreground="{StaticResource Text}" Padding="0" Margin="0,14,0,6" />
-                                <TextBox x:Name="ProfileProcess" MaxLength="255" Width="280" HorizontalAlignment="Left" />
+                                <Grid HorizontalAlignment="Left">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="350" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="ProfileApplication" Style="{StaticResource ProfileApplicationPicker}"
+                                              IsEnabled="False" SelectionChanged="ProfileApplicationChanged" TextSearch.TextPath="Label">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button x:Name="RefreshProfileApplicationsButton" Grid.Column="1" Content="Обновить"
+                                            AutomationProperties.Name="Обновить список открытых приложений"
+                                            Click="RefreshProfileApplicationsClick" Margin="8,0,0,0" />
+                                </Grid>
+                                <TextBlock x:Name="ProfileApplicationStatus" Style="{StaticResource SecondaryText}"
+                                           Visibility="Collapsed" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite" />
                                 <TextBlock Text="Приоритет в фокусе" Margin="0,14,0,6" />
                                 <WrapPanel x:Name="PriorityChoices" Margin="0,0,0,8">
                                     <RadioButton x:Name="AbovePriority" Content="Выше обычного" Style="{StaticResource ChoiceButton}" GroupName="Priority" IsChecked="True" />
@@ -345,7 +363,7 @@
                                     <RadioButton Content="Ниже обычного" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
                                 </WrapPanel>
                                 <WrapPanel>
-                                    <Button x:Name="StartProfileButton" Content="Запустить профиль" Style="{StaticResource PrimaryButton}" Click="StartProfileClick" Margin="0,0,8,0" />
+                                    <Button x:Name="StartProfileButton" Content="Запустить профиль" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="StartProfileClick" Margin="0,0,8,0" />
                                     <Button x:Name="StopProfileButton" Content="Остановить" IsEnabled="False" Click="StopProfileClick" />
                                 </WrapPanel>
                             </StackPanel>
