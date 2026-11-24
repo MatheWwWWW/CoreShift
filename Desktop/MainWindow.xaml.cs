@@ -25,7 +25,8 @@ public partial class MainWindow : Window
     private sealed record PcInfoRow(string Label, string Value);
     private sealed record CleanRow(string Path, string Size);
     private sealed record CleanCategoryRow(string Heading, string Roots, string Skipped);
-    private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories, long TotalBytes);
+    private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories,
+        long TotalBytes, bool IncludesWerQueue);
     private sealed record ProfileApplicationRow(string ProcessName, string Label);
     private sealed record TweakRow(WindowsTweak Tweak, string State, bool CanApply, bool CanRestore)
     {
@@ -58,6 +59,10 @@ public partial class MainWindow : Window
         CleanIcons.Unchecked += CleanCategoryChanged;
         CleanDirectX.Checked += CleanCategoryChanged;
         CleanDirectX.Unchecked += CleanCategoryChanged;
+        CleanWerArchive.Checked += CleanCategoryChanged;
+        CleanWerArchive.Unchecked += CleanCategoryChanged;
+        CleanWerQueue.Checked += CleanCategoryChanged;
+        CleanWerQueue.Unchecked += CleanCategoryChanged;
         using var identity = WindowsIdentity.GetCurrent();
         isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
@@ -279,7 +284,8 @@ public partial class MainWindow : Window
     }
 
     private bool HasCleanSelection => CleanTemp.IsChecked == true ||
-        CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true || CleanDirectX.IsChecked == true;
+        CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true || CleanDirectX.IsChecked == true ||
+        CleanWerArchive.IsChecked == true || CleanWerQueue.IsChecked == true;
 
     private void CleanCategoryChanged(object sender, RoutedEventArgs e)
     {
@@ -304,7 +310,7 @@ public partial class MainWindow : Window
         if (closing || !ScanButton.IsEnabled)
             return;
 
-        var selected = new List<(CleanupCategory Category, string Name)>(4);
+        var selected = new List<(CleanupCategory Category, string Name)>(6);
         if (CleanTemp.IsChecked == true)
             selected.Add((CleanupCategory.Temp, (string)CleanTemp.Content));
         if (CleanThumbnails.IsChecked == true)
@@ -313,6 +319,10 @@ public partial class MainWindow : Window
             selected.Add((CleanupCategory.ExplorerIcons, (string)CleanIcons.Content));
         if (CleanDirectX.IsChecked == true)
             selected.Add((CleanupCategory.DirectXShaders, (string)CleanDirectX.Content));
+        if (CleanWerArchive.IsChecked == true)
+            selected.Add((CleanupCategory.WerArchive, (string)CleanWerArchive.Content));
+        if (CleanWerQueue.IsChecked == true)
+            selected.Add((CleanupCategory.WerQueue, (string)CleanWerQueue.Content));
         int selectionVersion = cleanSelectionVersion;
 
         ClearScan();
@@ -350,6 +360,7 @@ public partial class MainWindow : Window
         var candidates = new List<TempFile>();
         var files = new List<CleanRow>();
         long totalBytes = 0;
+        bool includesWerQueue = false;
         for (int i = 0; i < selected.Count; i++)
         {
             var (category, name) = selected[i];
@@ -366,6 +377,7 @@ public partial class MainWindow : Window
                 categoryBytes += file.Bytes;
             }
             totalBytes += categoryBytes;
+            includesWerQueue |= category == CleanupCategory.WerQueue && report.Candidates.Count > 0;
             categories[i] = new CleanCategoryRow(
                 $"{name} — к удалению: {categoryCount:N0} · {DiskCleaner.FormatBytes(categoryBytes)}",
                 $"Папки: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
@@ -373,14 +385,15 @@ public partial class MainWindow : Window
                 $"недоступных папок {report.UnavailableFolders}, ссылок {report.SkippedLinks}.");
         }
 
-        return new CleanPreview(candidates, files, categories, totalBytes);
+        return new CleanPreview(candidates, files, categories, totalBytes, includesWerQueue);
     }
 
     private async void DeleteClick(object sender, RoutedEventArgs e)
     {
         if (closing || !DeleteButton.IsEnabled || lastScan is not { Candidates.Count: > 0 } scan ||
             !Confirm("Удалить файлы из предпросмотра?",
-                $"Файлы из проверенного списка будут удалены без перемещения в корзину. Количество: {scan.Candidates.Count:N0}.",
+                $"Файлы из проверенного списка будут удалены без перемещения в корзину. Количество: {scan.Candidates.Count:N0}." +
+                (scan.IncludesWerQueue ? "\n\nВ списке есть файлы из очереди Windows. Неотправленные данные будут потеряны." : ""),
                 "Удалить файлы") || closing || !ReferenceEquals(lastScan, scan))
             return;
 

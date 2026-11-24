@@ -13,12 +13,14 @@ if (args is ["--cache-preview"])
 {
     CheckExplorerCache();
     CheckDirectXCache();
+    CheckWindowsReports();
     return;
 }
 
 CheckTempCleanup();
 CheckExplorerCache();
 CheckDirectXCache();
+CheckWindowsReports();
 CheckTweakRestore();
 CheckPagefileAdvice();
 CheckContextProfile();
@@ -130,6 +132,38 @@ static void CheckDirectXCache()
         Require(File.Exists(oldShader) && File.Exists(freshShader) && File.Exists(vendorShader),
             "DirectX preview must not remove files.");
         Console.WriteLine("PASS DirectX shader cache preview");
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckWindowsReports()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
+    try
+    {
+        string wer = Path.Combine(scratch.FullName, "Microsoft", "Windows", "WER");
+        string archived = Path.Combine(Directory.CreateDirectory(Path.Combine(wer, "ReportArchive", "old")).FullName, "Report.wer");
+        string queued = Path.Combine(Directory.CreateDirectory(Path.Combine(wer, "ReportQueue", "old")).FullName, "dump.mdmp");
+        string recent = Path.Combine(Directory.CreateDirectory(Path.Combine(wer, "ReportQueue", "recent")).FullName, "Report.wer");
+        string outside = Path.Combine(Directory.CreateDirectory(Path.Combine(wer, "Temp")).FullName, "unrelated.mdmp");
+        DateTime now = new(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        foreach (string path in new[] { archived, queued, recent, outside })
+        {
+            File.WriteAllText(path, "report");
+            File.SetLastWriteTimeUtc(path, now.AddDays(path == recent ? -30 : -31));
+        }
+
+        var archive = DiskCleaner.ScanWindowsReports(CleanupCategory.WerArchive, scratch.FullName, now);
+        var queue = DiskCleaner.ScanWindowsReports(CleanupCategory.WerQueue, scratch.FullName, now);
+        Require(archive.Candidates.Count == 1 && archive.Candidates[0].Path == archived,
+            "Archived report preview must not include queued reports or other WER folders.");
+        Require(queue.Candidates.Count == 1 && queue.Candidates[0].Path == queued && queue.RecentFiles == 1,
+            "Queued report preview must exclude the archive, other WER folders, and files not older than 30 days.");
+        Require(File.Exists(archived) && File.Exists(queued), "WER preview must not remove reports.");
+        Console.WriteLine("PASS Windows error report previews");
     }
     finally
     {

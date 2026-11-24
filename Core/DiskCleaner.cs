@@ -4,7 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SmartResourceDispatcher.Core;
 
-internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders }
+internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders, WerArchive, WerQueue }
 
 internal sealed record TempFile(string Path, long Bytes, DateTime LastWriteUtc);
 
@@ -16,12 +16,19 @@ internal sealed record CleanResult(int DeletedFiles, long DeletedBytes, int Busy
 
 internal static class DiskCleaner
 {
+    private static readonly TempScanReport UnavailableRoot = new([], [], 0, 0, 0, 1, 0, 0);
+
     internal static TempScanReport ScanTempFolders() =>
         ScanCategory(CleanupCategory.Temp);
 
     internal static TempScanReport ScanCategory(CleanupCategory category)
     {
-        DateTime cutoffUtc = DateTime.UtcNow.AddDays(-1);
+        DateTime nowUtc = DateTime.UtcNow;
+        if (category is CleanupCategory.WerArchive or CleanupCategory.WerQueue)
+            return ScanWindowsReports(category,
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), nowUtc);
+
+        DateTime cutoffUtc = nowUtc.AddDays(-1);
         if (category == CleanupCategory.Temp)
             return Scan(GetTargetTempPaths(), cutoffUtc);
 
@@ -32,7 +39,7 @@ internal static class DiskCleaner
     internal static TempScanReport ScanLocalCache(CleanupCategory category, string localAppData, DateTime cutoffUtc)
     {
         if (!Path.IsPathFullyQualified(localAppData))
-            return new TempScanReport([], [], 0, 0, 0, 1, 0, 0);
+            return UnavailableRoot;
 
         switch (category)
         {
@@ -45,6 +52,20 @@ internal static class DiskCleaner
             default:
                 throw new ArgumentOutOfRangeException(nameof(category));
         }
+    }
+
+    internal static TempScanReport ScanWindowsReports(CleanupCategory category, string programData, DateTime nowUtc)
+    {
+        if (!Path.IsPathFullyQualified(programData))
+            return UnavailableRoot;
+
+        string folder = category switch
+        {
+            CleanupCategory.WerArchive => "ReportArchive",
+            CleanupCategory.WerQueue => "ReportQueue",
+            _ => throw new ArgumentOutOfRangeException(nameof(category))
+        };
+        return Scan([Path.Combine(programData, "Microsoft", "Windows", "WER", folder)], nowUtc.AddDays(-30));
     }
 
     private static IEnumerable<string> GetTargetTempPaths()
@@ -116,7 +137,7 @@ internal static class DiskCleaner
                         long size = file.Length;
                         total += size;
                         DateTime lastWriteUtc = file.LastWriteTimeUtc;
-                        if (lastWriteUtc > cutoffUtc || (explorerPrefix is not null && lastWriteUtc == cutoffUtc))
+                        if (lastWriteUtc >= cutoffUtc)
                         {
                             recent++;
                             continue;
