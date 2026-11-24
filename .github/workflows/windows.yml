@@ -1,0 +1,23 @@
+name: Windows build and checks
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Tests/SmartResourceDispatcher.Checks.csproj --locked-mode
+      - run: dotnet restore Desktop/CoreShift.Desktop.csproj --locked-mode
+      - run: dotnet build Tests/SmartResourceDispatcher.Checks.csproj --configuration Release --no-restore
+      - run: dotnet build Desktop/CoreShift.Desktop.csproj --configuration Release --no-restore
+      - run: dotnet run --project Tests/SmartResourceDispatcher.Checks.csproj --configuration Release --no-build
+      - run: dotnet run --project SmartResourceDispatcher.csproj --configuration Release --no-build -- status

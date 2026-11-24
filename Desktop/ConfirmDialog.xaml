@@ -1,0 +1,17 @@
+<Window x:Class="CoreShift.Desktop.ConfirmDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="460" SizeToContent="Height" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        WindowStyle="None" ResizeMode="NoResize" Background="{StaticResource Panel}"
+        Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13">
+    <Border BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="23">
+        <StackPanel>
+            <TextBlock x:Name="Heading" Style="{StaticResource SectionTitle}" FontSize="20" TextWrapping="Wrap" />
+            <TextBlock x:Name="Message" Style="{StaticResource SecondaryText}" Margin="0,10,0,21" />
+            <WrapPanel HorizontalAlignment="Right">
+                <Button x:Name="CancelButton" Content="Отмена" IsCancel="True" Margin="0,0,8,0" />
+                <Button x:Name="ActionButton" Style="{StaticResource PrimaryButton}" Click="ConfirmClick" />
+            </WrapPanel>
+        </StackPanel>
+    </Border>
+</Window>
