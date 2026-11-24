@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private sealed record PagefileRow(string Name, string Usage);
     private sealed record PcInfoRow(string Label, string Value);
     private sealed record CleanRow(string Path, string Size);
+    private sealed record CleanCategoryRow(string Heading, string Roots, string Skipped);
+    private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories, long TotalBytes);
     private sealed record TweakRow(WindowsTweak Tweak, string State, bool CanApply, bool CanRestore)
     {
         public string Name => Tweak.Name;
@@ -34,7 +36,8 @@ public partial class MainWindow : Window
     private readonly bool isElevated;
     private readonly HashSet<Task> pendingOperations = [];
     private readonly ObservableCollection<string> profileEvents = [];
-    private TempScanReport? lastScan;
+    private CleanPreview? lastScan;
+    private int cleanSelectionVersion;
     private CancellationTokenSource? profileStop;
     private Task<bool>? profileTask;
     private bool loadingPcInfo;
@@ -45,6 +48,12 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        CleanTemp.Checked += CleanCategoryChanged;
+        CleanTemp.Unchecked += CleanCategoryChanged;
+        CleanThumbnails.Checked += CleanCategoryChanged;
+        CleanThumbnails.Unchecked += CleanCategoryChanged;
+        CleanIcons.Checked += CleanCategoryChanged;
+        CleanIcons.Unchecked += CleanCategoryChanged;
         using var identity = WindowsIdentity.GetCurrent();
         isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
@@ -263,49 +272,112 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool HasCleanSelection => CleanTemp.IsChecked == true ||
+        CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true;
+
+    private void CleanCategoryChanged(object sender, RoutedEventArgs e)
+    {
+        cleanSelectionVersion++;
+        ClearScan();
+        bool hasSelection = HasCleanSelection;
+        ScanButton.IsEnabled = CleanCategoryChoices.IsEnabled && hasSelection;
+        SetStatus(CleanStatus, hasSelection
+            ? "Запустите сканирование, чтобы увидеть список файлов."
+            : "Выберите хотя бы одну категорию для сканирования.");
+    }
+
+    private void SetCleanBusy(bool busy)
+    {
+        CleanCategoryChoices.IsEnabled = !busy;
+        ScanButton.IsEnabled = !busy && HasCleanSelection;
+        DeleteButton.IsEnabled = !busy && lastScan is { Candidates.Count: > 0 };
+    }
+
     private async void ScanClick(object sender, RoutedEventArgs e)
     {
+        if (closing || !ScanButton.IsEnabled)
+            return;
+
+        var selected = new List<(CleanupCategory Category, string Name)>(3);
+        if (CleanTemp.IsChecked == true)
+            selected.Add((CleanupCategory.Temp, (string)CleanTemp.Content));
+        if (CleanThumbnails.IsChecked == true)
+            selected.Add((CleanupCategory.ExplorerThumbnails, (string)CleanThumbnails.Content));
+        if (CleanIcons.IsChecked == true)
+            selected.Add((CleanupCategory.ExplorerIcons, (string)CleanIcons.Content));
+        int selectionVersion = cleanSelectionVersion;
+
         ClearScan();
-        ScanButton.IsEnabled = false;
-        SetStatus(CleanStatus, "Сканируем папки Temp…");
+        SetCleanBusy(true);
+        SetStatus(CleanStatus, "Сканируем выбранные категории…");
         try
         {
-            var scan = await RunInBackground(DiskCleaner.ScanTempFolders);
+            var scan = await RunInBackground(() => ScanCleanCategories(selected));
+            if (selectionVersion != cleanSelectionVersion)
+                return;
+
             lastScan = scan;
             SetStatus(CleanStatus, scan.Candidates.Count > 0
-                ? $"К удалению: {scan.Candidates.Count:N0} · {DiskCleaner.FormatBytes(scan.Candidates.Sum(file => file.Bytes))}"
+                ? $"К удалению: {scan.Candidates.Count:N0} · {DiskCleaner.FormatBytes(scan.TotalBytes)}"
                 : "Сканирование завершено. Файлов к удалению нет.");
-            CleanDetails.Text = $"Папки: {string.Join(", ", scan.Roots)}\n" +
-                $"Пропущено: свежих {scan.RecentFiles}, занятых {scan.BusyFiles}, недоступных файлов {scan.UnavailableFiles}, " +
-                $"недоступных папок {scan.UnavailableFolders}, ссылок {scan.SkippedLinks}.";
-            CleanItems.ItemsSource = scan.Candidates.Select(file => new CleanRow(file.Path, DiskCleaner.FormatBytes(file.Bytes))).ToArray();
+            CleanDetails.ItemsSource = scan.Categories;
+            CleanItems.ItemsSource = scan.Files;
             CleanItems.Visibility = VisibleWhen(scan.Candidates.Count > 0);
-            DeleteButton.IsEnabled = scan.Candidates.Count > 0;
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            SetStatus(CleanStatus, ex.Message, error: true);
+            if (selectionVersion == cleanSelectionVersion)
+                SetStatus(CleanStatus, ex.Message, error: true);
         }
         finally
         {
-            ScanButton.IsEnabled = true;
+            SetCleanBusy(false);
         }
+    }
+
+    private static CleanPreview ScanCleanCategories(List<(CleanupCategory Category, string Name)> selected)
+    {
+        var categories = new CleanCategoryRow[selected.Count];
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var candidates = new List<TempFile>();
+        var files = new List<CleanRow>();
+        long totalBytes = 0;
+        for (int i = 0; i < selected.Count; i++)
+        {
+            var (category, name) = selected[i];
+            var report = DiskCleaner.ScanCategory(category);
+            categories[i] = new CleanCategoryRow(
+                $"{name} — к удалению: {report.Candidates.Count:N0} · {DiskCleaner.FormatBytes(report.TotalBytes)}",
+                $"Папки: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
+                $"Пропущено: свежих {report.RecentFiles}, занятых {report.BusyFiles}, недоступных файлов {report.UnavailableFiles}, " +
+                $"недоступных папок {report.UnavailableFolders}, ссылок {report.SkippedLinks}.");
+            foreach (var file in report.Candidates)
+            {
+                if (!paths.Add(file.Path))
+                    continue;
+                candidates.Add(file);
+                files.Add(new CleanRow(file.Path, DiskCleaner.FormatBytes(file.Bytes)));
+                totalBytes += file.Bytes;
+            }
+        }
+
+        return new CleanPreview(candidates, files, categories, totalBytes);
     }
 
     private async void DeleteClick(object sender, RoutedEventArgs e)
     {
-        if (lastScan is not { Candidates.Count: > 0 } scan ||
-            !Confirm("Удалить временные файлы?",
+        if (closing || !DeleteButton.IsEnabled || lastScan is not { Candidates.Count: > 0 } scan ||
+            !Confirm("Удалить файлы из предпросмотра?",
                 $"Файлы из проверенного списка будут удалены без перемещения в корзину. Количество: {scan.Candidates.Count:N0}.",
-                "Удалить файлы"))
+                "Удалить файлы") || closing || !ReferenceEquals(lastScan, scan))
             return;
 
         ClearScan();
-        ScanButton.IsEnabled = false;
+        SetCleanBusy(true);
         SetStatus(CleanStatus, "Удаляем файлы из предпросмотра…");
         try
         {
-            var result = await RunInBackground(() => DiskCleaner.Clean(scan));
+            var result = await RunInBackground(() => DiskCleaner.Clean(scan.Candidates));
             SetStatus(CleanStatus, $"Удалено: {result.DeletedFiles:N0} · {DiskCleaner.FormatBytes(result.DeletedBytes)}. " +
                 $"Занято: {result.BusyFiles}. Изменились или недоступны: {result.SkippedFiles}.");
         }
@@ -315,7 +387,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            ScanButton.IsEnabled = true;
+            SetCleanBusy(false);
         }
     }
 
@@ -325,7 +397,7 @@ public partial class MainWindow : Window
         DeleteButton.IsEnabled = false;
         CleanItems.ItemsSource = null;
         CleanItems.Visibility = Visibility.Collapsed;
-        CleanDetails.Text = "";
+        CleanDetails.ItemsSource = null;
     }
 
     private async Task RefreshTweaksAsync()

@@ -4,6 +4,8 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SmartResourceDispatcher.Core;
 
+internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons }
+
 internal sealed record TempFile(string Path, long Bytes, DateTime LastWriteUtc);
 
 internal sealed record TempScanReport(
@@ -15,7 +17,38 @@ internal sealed record CleanResult(int DeletedFiles, long DeletedBytes, int Busy
 internal static class DiskCleaner
 {
     internal static TempScanReport ScanTempFolders() =>
-        Scan(GetTargetTempPaths(), DateTime.UtcNow.AddDays(-1));
+        ScanCategory(CleanupCategory.Temp);
+
+    internal static TempScanReport ScanCategory(CleanupCategory category)
+    {
+        DateTime cutoffUtc = DateTime.UtcNow.AddDays(-1);
+        switch (category)
+        {
+            case CleanupCategory.Temp:
+                return Scan(GetTargetTempPaths(), cutoffUtc);
+            case CleanupCategory.ExplorerThumbnails:
+            case CleanupCategory.ExplorerIcons:
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (!Path.IsPathFullyQualified(localAppData))
+                    return new TempScanReport([], [], 0, 0, 0, 1, 0, 0);
+
+                return ScanExplorerCache(Path.Combine(localAppData, "Microsoft", "Windows", "Explorer"), category, cutoffUtc);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(category));
+        }
+    }
+
+    internal static TempScanReport ScanExplorerCache(string explorerFolder, CleanupCategory category, DateTime cutoffUtc)
+    {
+        string prefix = category switch
+        {
+            CleanupCategory.ExplorerThumbnails => "thumbcache_",
+            CleanupCategory.ExplorerIcons => "iconcache_",
+            _ => throw new ArgumentOutOfRangeException(nameof(category))
+        };
+
+        return Scan([explorerFolder], cutoffUtc, prefix);
+    }
 
     private static IEnumerable<string> GetTargetTempPaths()
     {
@@ -26,6 +59,9 @@ internal static class DiskCleaner
     }
 
     internal static TempScanReport Scan(IEnumerable<string> folders, DateTime cutoffUtc)
+        => Scan(folders, cutoffUtc, explorerPrefix: null);
+
+    private static TempScanReport Scan(IEnumerable<string> folders, DateTime cutoffUtc, string? explorerPrefix)
     {
         string[] roots = folders.Select(path => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -60,6 +96,12 @@ internal static class DiskCleaner
                 {
                     try
                     {
+                        if (explorerPrefix is not null &&
+                            (entry is not FileInfo ||
+                             !entry.Name.StartsWith(explorerPrefix, StringComparison.OrdinalIgnoreCase) ||
+                             !entry.Name.EndsWith(".db", StringComparison.OrdinalIgnoreCase)))
+                            continue;
+
                         FileAttributes attributes = entry.Attributes;
                         if (attributes.HasFlag(FileAttributes.ReparsePoint))
                         {
@@ -76,7 +118,8 @@ internal static class DiskCleaner
                         var file = (FileInfo)entry;
                         long size = file.Length;
                         total += size;
-                        if (file.LastWriteTimeUtc > cutoffUtc)
+                        DateTime lastWriteUtc = file.LastWriteTimeUtc;
+                        if (lastWriteUtc > cutoffUtc || (explorerPrefix is not null && lastWriteUtc == cutoffUtc))
                         {
                             recent++;
                             continue;
@@ -89,7 +132,7 @@ internal static class DiskCleaner
                         }
 
                         CheckFileSharing(file);
-                        candidates.Add(new TempFile(file.FullName, size, file.LastWriteTimeUtc));
+                        candidates.Add(new TempFile(file.FullName, size, lastWriteUtc));
                     }
                     catch (IOException ex) when (IsSharingViolation(ex))
                     {
@@ -110,11 +153,11 @@ internal static class DiskCleaner
         return new TempScanReport(roots, candidates, total, busy, unavailableFiles, unavailableFolders, links, recent);
     }
 
-    internal static CleanResult Clean(TempScanReport scan)
+    internal static CleanResult Clean(IEnumerable<TempFile> candidates)
     {
         int deleted = 0, busy = 0, skipped = 0;
         long bytes = 0;
-        foreach (var candidate in scan.Candidates)
+        foreach (var candidate in candidates)
         {
             try
             {

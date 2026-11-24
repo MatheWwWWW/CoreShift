@@ -275,13 +275,33 @@
                         <TextBlock Style="{StaticResource SecondaryText}" Text="Просмотр временных файлов старше 24 часов перед удалением." Margin="0,4,0,17" />
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
+                                <WrapPanel x:Name="CleanCategoryChoices">
+                                    <CheckBox x:Name="CleanTemp" Content="Папки Temp (пользовательская и системная)" IsChecked="True"
+                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                    <CheckBox x:Name="CleanThumbnails" Content="Миниатюры Проводника"
+                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                    <CheckBox x:Name="CleanIcons" Content="Кэш иконок"
+                                              Foreground="{StaticResource Text}" Margin="0,0,0,8" />
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
+                                           Text="Windows восстановит кэш Проводника по мере необходимости. Занятые файлы пропускаются." />
                                 <WrapPanel>
                                     <Button x:Name="ScanButton" Content="Сканировать" Style="{StaticResource PrimaryButton}" Click="ScanClick" Margin="0,0,8,0" />
                                     <Button x:Name="DeleteButton" Content="Удалить найденное" IsEnabled="False" Click="DeleteClick" />
                                 </WrapPanel>
                                 <TextBlock x:Name="CleanStatus" Style="{StaticResource SecondaryText}" Margin="0,13,0,0"
                                            Text="Запустите сканирование, чтобы увидеть список файлов." AutomationProperties.LiveSetting="Polite" />
-                                <TextBlock x:Name="CleanDetails" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
+                                <ItemsControl x:Name="CleanDetails">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,10,0,0">
+                                                <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Roots}" Style="{StaticResource SecondaryText}" />
+                                                <TextBlock Text="{Binding Skipped}" Style="{StaticResource SecondaryText}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <ListBox x:Name="CleanItems" Visibility="Collapsed" Height="290" Margin="0,13,0,0"
                                          Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.VirtualizationMode="Recycling"

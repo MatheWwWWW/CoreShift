@@ -105,7 +105,7 @@ static int Clean(bool apply)
     if (!string.Equals(Console.ReadLine()?.Trim(), "y", StringComparison.OrdinalIgnoreCase))
         return 0;
 
-    var result = DiskCleaner.Clean(scan);
+    var result = DiskCleaner.Clean(scan.Candidates);
     Console.WriteLine($"Удалено файлов: {result.DeletedFiles} ({DiskCleaner.FormatBytes(result.DeletedBytes)}). Занято: {result.BusyFiles}. Изменились или недоступны: {result.SkippedFiles}.");
     return result.BusyFiles > 0 || result.SkippedFiles > 0 ? 1 : 0;
 }

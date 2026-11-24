@@ -9,7 +9,14 @@ if (args is ["--idle"])
     return;
 }
 
+if (args is ["--explorer-cache"])
+{
+    CheckExplorerCache();
+    return;
+}
+
 CheckTempCleanup();
+CheckExplorerCache();
 CheckTweakRestore();
 CheckPagefileAdvice();
 CheckContextProfile();
@@ -40,13 +47,58 @@ static void CheckTempCleanup()
 
         File.AppendAllText(changed, " changed");
         using var newlyBusyHandle = File.Open(newlyBusy, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        var clean = DiskCleaner.Clean(scan);
+        var clean = DiskCleaner.Clean(scan.Candidates);
         Require(clean.DeletedFiles == 1 && clean.DeletedBytes == 4 && clean.BusyFiles == 1 && clean.SkippedFiles == 1,
             $"Unexpected cleanup result: {clean}.");
         Require(!File.Exists(stale) && File.Exists(changed) && File.Exists(recent) && File.Exists(busy) && File.Exists(newlyBusy),
             "Cleanup should leave changed, recent and busy files alone.");
         Console.WriteLine("PASS Temp preview and cleanup");
         CheckTempLink(root, scratch.CreateSubdirectory("other").FullName);
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckExplorerCache()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
+    try
+    {
+        string root = scratch.FullName;
+        string nested = scratch.CreateSubdirectory("nested").FullName;
+        string thumbnail = Path.Combine(root, "THUMBCACHE_96.DB");
+        string icon = Path.Combine(root, "iCoNcAcHe_32.dB");
+        string recent = Path.Combine(root, "thumbcache_recent.db");
+        DateTime now = DateTime.UtcNow;
+
+        foreach (string path in new[]
+        {
+            thumbnail, icon,
+            Path.Combine(root, "thumbcache_other.txt"),
+            Path.Combine(root, "iconcache_backup.db.bak"),
+            Path.Combine(root, "unrelated.db"),
+            Path.Combine(root, "not_thumbcache_96.db"),
+            Path.Combine(nested, "thumbcache_nested.db"),
+            Path.Combine(nested, "iconcache_nested.db")
+        })
+        {
+            File.WriteAllText(path, "test");
+            File.SetLastWriteTimeUtc(path, now.AddDays(-2));
+        }
+        File.WriteAllText(recent, "test");
+        File.SetLastWriteTimeUtc(recent, now);
+
+        DateTime cutoff = now.AddDays(-1);
+        var thumbnails = DiskCleaner.ScanExplorerCache(root, CleanupCategory.ExplorerThumbnails, cutoff);
+        var icons = DiskCleaner.ScanExplorerCache(root, CleanupCategory.ExplorerIcons, cutoff);
+        Require(thumbnails.Candidates.Count == 1 && thumbnails.Candidates[0].Path == thumbnail && thumbnails.RecentFiles == 1,
+            "Thumbnail preview should include only old top-level thumbnail databases and count the recent match.");
+        Require(icons.Candidates.Count == 1 && icons.Candidates[0].Path == icon && icons.RecentFiles == 0,
+            "Icon preview should include only old top-level icon databases.");
+        Require(File.Exists(thumbnail) && File.Exists(icon), "Explorer preview removed a file.");
+        Console.WriteLine("PASS Explorer cache preview");
     }
     finally
     {
