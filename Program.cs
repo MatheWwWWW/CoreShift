@@ -106,8 +106,9 @@ static int Clean(bool apply)
         return 0;
 
     var result = DiskCleaner.Clean(scan.Candidates);
-    Console.WriteLine($"Удалено файлов: {result.DeletedFiles} ({DiskCleaner.FormatBytes(result.DeletedBytes)}). Занято: {result.BusyFiles}. Изменились или недоступны: {result.SkippedFiles}.");
-    return result.BusyFiles > 0 || result.SkippedFiles > 0 ? 1 : 0;
+    Console.WriteLine($"Удалено файлов: {result.DeletedFiles} ({DiskCleaner.FormatBytes(result.DeletedBytes)}). " +
+        $"Занято: {result.BusyFiles}. Windows отказала в доступе: {result.DeniedFiles}. Изменились или недоступны: {result.SkippedFiles}.");
+    return result.BusyFiles > 0 || result.DeniedFiles > 0 || result.SkippedFiles > 0 ? 1 : 0;
 }
 
 static int Trim(int pid)

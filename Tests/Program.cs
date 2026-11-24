@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Win32;
 using SmartResourceDispatcher.Core;
 
@@ -20,6 +22,7 @@ if (args is ["--cache-preview"])
 }
 
 CheckTempCleanup();
+CheckTempDeleteAccess();
 CheckExplorerCache();
 CheckDirectXCache();
 CheckNvidiaCaches();
@@ -62,6 +65,61 @@ static void CheckTempCleanup()
             "Cleanup should leave changed, recent and busy files alone.");
         Console.WriteLine("PASS Temp preview and cleanup");
         CheckTempLink(root, scratch.CreateSubdirectory("other").FullName);
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckTempDeleteAccess()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-acl-check-");
+    try
+    {
+        var folder = scratch.CreateSubdirectory("temp");
+        var protectedFile = new FileInfo(Path.Combine(folder.FullName, "protected.tmp"));
+        string removable = Path.Combine(folder.FullName, "removable.tmp");
+        DateTime cutoff = DateTime.UtcNow.AddDays(-1);
+        foreach (string path in new[] { protectedFile.FullName, removable })
+        {
+            File.WriteAllText(path, "test");
+            File.SetLastWriteTimeUtc(path, cutoff.AddDays(-1));
+        }
+
+        var before = DiskCleaner.Scan([folder.FullName], cutoff);
+        Require(before.Candidates.Count == 2, "Both test files should initially be removable.");
+
+        using var identity = WindowsIdentity.GetCurrent();
+        var user = identity.User!;
+        var originalFolderAcl = folder.GetAccessControl(AccessControlSections.Access);
+        var originalFileAcl = protectedFile.GetAccessControl(AccessControlSections.Access);
+        var folderAcl = folder.GetAccessControl(AccessControlSections.Access);
+        var fileAcl = protectedFile.GetAccessControl(AccessControlSections.Access);
+        folderAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.DeleteSubdirectoriesAndFiles, AccessControlType.Deny));
+        fileAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.Delete, AccessControlType.Deny));
+        try
+        {
+            folder.SetAccessControl(folderAcl);
+            protectedFile.SetAccessControl(fileAcl);
+            Require(File.ReadAllText(protectedFile.FullName) == "test", "The protected test file should still be readable.");
+
+            var after = DiskCleaner.Scan([folder.FullName], cutoff);
+            Require(after.Candidates.Count == 1 && after.Candidates[0].Path == removable && after.UnavailableFiles == 1,
+                "A readable file without DELETE access must not show up as removable.");
+
+            var result = DiskCleaner.Clean(before.Candidates);
+            Require(result.DeletedFiles == 1 && result.DeniedFiles == 1 &&
+                File.Exists(protectedFile.FullName) && !File.Exists(removable),
+                $"Cleanup must report access revoked after preview and still remove the other file: {result}.");
+            Console.WriteLine("PASS Windows delete access in Temp preview and cleanup");
+        }
+        finally
+        {
+            folder.SetAccessControl(originalFolderAcl);
+            if (File.Exists(protectedFile.FullName))
+                protectedFile.SetAccessControl(originalFileAcl);
+        }
     }
     finally
     {

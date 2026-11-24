@@ -16,7 +16,7 @@ internal sealed record TempScanReport(
     IReadOnlyList<string> Roots, IReadOnlyList<TempFile> Candidates, long TotalBytes,
     int BusyFiles, int UnavailableFiles, int UnavailableFolders, int SkippedLinks, int RecentFiles);
 
-internal sealed record CleanResult(int DeletedFiles, long DeletedBytes, int BusyFiles, int SkippedFiles);
+internal sealed record CleanResult(int DeletedFiles, long DeletedBytes, int BusyFiles, int DeniedFiles, int SkippedFiles);
 
 internal static class DiskCleaner
 {
@@ -199,7 +199,15 @@ internal static class DiskCleaner
                     return;
                 }
 
-                CheckFileSharing(file);
+                int error = CheckCleanupAccess(file);
+                if (error != 0)
+                {
+                    if (IsSharingViolation(error))
+                        busy++;
+                    else
+                        unavailableFiles++;
+                    return;
+                }
                 candidates.Add(new TempFile(file.FullName, size, lastWriteUtc));
             }
             catch (IOException ex) when (IsSharingViolation(ex))
@@ -217,7 +225,7 @@ internal static class DiskCleaner
 
     internal static CleanResult Clean(IEnumerable<TempFile> candidates)
     {
-        int deleted = 0, busy = 0, skipped = 0;
+        int deleted = 0, busy = 0, denied = 0, skipped = 0;
         long bytes = 0;
         foreach (var candidate in candidates)
         {
@@ -238,36 +246,37 @@ internal static class DiskCleaner
                     case DeleteOutcome.Busy:
                         busy++;
                         break;
+                    case DeleteOutcome.Denied:
+                        denied++;
+                        break;
                     default:
                         skipped++;
                         break;
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (UnauthorizedAccessException)
+            {
+                denied++;
+            }
+            catch (IOException)
             {
                 skipped++;
             }
         }
 
-        return new CleanResult(deleted, bytes, busy, skipped);
+        return new CleanResult(deleted, bytes, busy, denied, skipped);
     }
 
-    private enum DeleteOutcome { Skipped, Busy, Deleted }
+    private enum DeleteOutcome { Skipped, Busy, Denied, Deleted }
 
     private static DeleteOutcome DeleteCandidate(TempFile candidate)
     {
-        const uint deleteAccess = 0x00010000;
-        const uint readAttributes = 0x80;
-        const uint openExisting = 3;
-        const uint openReparsePoint = 0x00200000;
-        string expectedPath = candidate.Path.StartsWith(@"\\?\", StringComparison.Ordinal) ? candidate.Path
-            : candidate.Path.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + candidate.Path[2..]
-            : @"\\?\" + candidate.Path;
+        string expectedPath = ExtendedPath(candidate.Path);
 
         // Validate and delete through the same handle so the checked path is never reopened for deletion.
-        using var handle = CreateFileW(expectedPath, deleteAccess | readAttributes, 0, 0, openExisting, openReparsePoint, 0);
+        using var handle = OpenForCleanup(expectedPath);
         if (handle.IsInvalid)
-            return IsSharingViolation(Marshal.GetLastWin32Error()) ? DeleteOutcome.Busy : DeleteOutcome.Skipped;
+            return DeleteFailure(Marshal.GetLastWin32Error());
 
         var openedPath = new StringBuilder(expectedPath.Length + 1);
         uint length = GetFinalPathNameByHandleW(handle, openedPath, (uint)openedPath.Capacity, 0);
@@ -282,8 +291,24 @@ internal static class DiskCleaner
         const int fileDispositionInfo = 4;
         byte deleteFile = 1;
         return SetFileInformationByHandle(handle, fileDispositionInfo, ref deleteFile, sizeof(byte))
-            ? DeleteOutcome.Deleted : DeleteOutcome.Skipped;
+            ? DeleteOutcome.Deleted : DeleteFailure(Marshal.GetLastWin32Error());
     }
+
+    private static string ExtendedPath(string path) => path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path
+        : path.StartsWith(@"\\", StringComparison.Ordinal) ? string.Concat(@"\\?\UNC\", path.AsSpan(2))
+        : @"\\?\" + path;
+
+    private static SafeFileHandle OpenForCleanup(string path)
+    {
+        const uint deleteAccess = 0x00010000;
+        const uint readAttributes = 0x80;
+        const uint openExisting = 3;
+        const uint openReparsePoint = 0x00200000;
+        return CreateFileW(path, deleteAccess | readAttributes, 0, 0, openExisting, openReparsePoint, 0);
+    }
+
+    private static DeleteOutcome DeleteFailure(int error) => IsSharingViolation(error) ? DeleteOutcome.Busy
+        : error == 5 ? DeleteOutcome.Denied : DeleteOutcome.Skipped;
 
     private static bool HasLinkedAncestor(string folder)
     {
@@ -296,9 +321,16 @@ internal static class DiskCleaner
         return false;
     }
 
-    private static void CheckFileSharing(FileInfo file)
+    private static int CheckCleanupAccess(FileInfo file)
     {
+        if (OperatingSystem.IsWindows())
+        {
+            using var handle = OpenForCleanup(ExtendedPath(file.FullName));
+            return handle.IsInvalid ? Marshal.GetLastWin32Error() : 0;
+        }
+
         using var stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.None);
+        return 0;
     }
 
     private static bool IsSharingViolation(IOException ex) => IsSharingViolation(ex.HResult & 0xffff);

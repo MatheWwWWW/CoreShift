@@ -515,7 +515,8 @@ public partial class MainWindow : Window
         {
             var result = await RunInBackground(() => DiskCleaner.Clean(scan.Candidates));
             SetStatus(CleanStatus, $"Удалено: {result.DeletedFiles:N0} · {DiskCleaner.FormatBytes(result.DeletedBytes)}. " +
-                $"Занято: {result.BusyFiles}. Изменились или недоступны: {result.SkippedFiles}.");
+                $"Занято: {result.BusyFiles}. Windows отказала в доступе: {result.DeniedFiles}. " +
+                $"Изменились или недоступны: {result.SkippedFiles}.");
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
