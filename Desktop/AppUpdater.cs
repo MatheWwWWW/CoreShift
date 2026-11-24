@@ -22,7 +22,8 @@ internal static class AppUpdater
     private const string Repository = "MatheWwWWW/CoreShift";
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{998EEA5D-ED30-49E3-A992-FF2AC2A9D7BB}_is1";
     private const long MaxInstallerSize = 250 * 1024 * 1024;
-    private static readonly string[] WorkerLibraries = ["DirectWriteForwarder.dll", "System.Printing.dll", "ijwhost.dll"];
+    private static readonly string[] WorkerLibraries =
+        ["DirectWriteForwarder.dll", "System.Printing.dll", "ijwhost.dll", "vcruntime140_cor3.dll"];
     private static readonly HttpClient Client = new()
     {
         Timeout = TimeSpan.FromSeconds(20),

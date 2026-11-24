@@ -4,7 +4,7 @@
     <TargetFramework>net11.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <Version>1.1.2</Version>
+    <Version>1.1.4</Version>
     <ApplicationIcon>CoreShift.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -20,11 +20,12 @@
           Condition="'%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.runtimeconfig.json'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.deps.json'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.exe'" />
-      <!-- .NET 11 WPF needs these mixed-mode files on disk. https://github.com/dotnet/wpf/issues/11842 -->
+      <!-- Keep WPF's mixed-mode assemblies and their native imports beside the executable. -->
       <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" ExcludeFromSingleFile="true"
           Condition="'%(ResolvedFileToPublish.RelativePath)' == 'DirectWriteForwarder.dll'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'System.Printing.dll'
-                  or '%(ResolvedFileToPublish.RelativePath)' == 'ijwhost.dll'" />
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'ijwhost.dll'
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'vcruntime140_cor3.dll'" />
     </ItemGroup>
   </Target>
 </Project>
