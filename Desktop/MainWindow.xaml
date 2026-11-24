@@ -284,6 +284,8 @@
                                               Foreground="{StaticResource Text}" Margin="0,0,16,8" />
                                     <CheckBox x:Name="CleanDirectX" Content="Кэш шейдеров DirectX"
                                               Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                    <CheckBox x:Name="CleanNvidia" Content="Кэш шейдеров NVIDIA"
+                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
                                     <CheckBox x:Name="CleanWerArchive" Content="Архив отчётов Windows"
                                               Foreground="{StaticResource Text}" Margin="0,0,16,8" />
                                     <CheckBox x:Name="CleanWerQueue" Content="Очередь отчётов Windows"
@@ -292,7 +294,7 @@
                                               Foreground="{StaticResource Text}" Margin="0,0,0,8" />
                                 </WrapPanel>
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
-                                           Text="Занятые файлы пропускаются. Windows пересоздаст кэши Проводника. После очистки кэша DirectX первые запуски игр могут подтормаживать, пока шейдеры компилируются заново." />
+                                           Text="Занятые файлы пропускаются. Windows пересоздаст кэши Проводника. После очистки кэшей шейдеров DirectX или NVIDIA первые запуски игр могут подтормаживать, пока шейдеры компилируются заново." />
                                 <TextBlock Style="{StaticResource SecondaryText}" Foreground="{StaticResource Warning}" Margin="0,0,0,12"
                                            Text="В очереди могут быть ещё не отправленные отчёты. Удаление не позволит Windows отправить эти данные." />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"

@@ -59,6 +59,8 @@ public partial class MainWindow : Window
         CleanIcons.Unchecked += CleanCategoryChanged;
         CleanDirectX.Checked += CleanCategoryChanged;
         CleanDirectX.Unchecked += CleanCategoryChanged;
+        CleanNvidia.Checked += CleanCategoryChanged;
+        CleanNvidia.Unchecked += CleanCategoryChanged;
         CleanWerArchive.Checked += CleanCategoryChanged;
         CleanWerArchive.Unchecked += CleanCategoryChanged;
         CleanWerQueue.Checked += CleanCategoryChanged;
@@ -287,7 +289,8 @@ public partial class MainWindow : Window
 
     private bool HasCleanSelection => CleanTemp.IsChecked == true ||
         CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true || CleanDirectX.IsChecked == true ||
-        CleanWerArchive.IsChecked == true || CleanWerQueue.IsChecked == true || CleanFontCache.IsChecked == true;
+        CleanNvidia.IsChecked == true || CleanWerArchive.IsChecked == true || CleanWerQueue.IsChecked == true ||
+        CleanFontCache.IsChecked == true;
 
     private void CleanCategoryChanged(object sender, RoutedEventArgs e)
     {
@@ -312,7 +315,7 @@ public partial class MainWindow : Window
         if (closing || !ScanButton.IsEnabled)
             return;
 
-        var selected = new List<(CleanupCategory Category, string Name)>(7);
+        var selected = new List<(CleanupCategory Category, string Name)>(8);
         if (CleanTemp.IsChecked == true)
             selected.Add((CleanupCategory.Temp, (string)CleanTemp.Content));
         if (CleanThumbnails.IsChecked == true)
@@ -321,6 +324,8 @@ public partial class MainWindow : Window
             selected.Add((CleanupCategory.ExplorerIcons, (string)CleanIcons.Content));
         if (CleanDirectX.IsChecked == true)
             selected.Add((CleanupCategory.DirectXShaders, (string)CleanDirectX.Content));
+        if (CleanNvidia.IsChecked == true)
+            selected.Add((CleanupCategory.NvidiaShaders, (string)CleanNvidia.Content));
         if (CleanWerArchive.IsChecked == true)
             selected.Add((CleanupCategory.WerArchive, (string)CleanWerArchive.Content));
         if (CleanWerQueue.IsChecked == true)

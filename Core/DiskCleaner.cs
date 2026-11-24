@@ -5,7 +5,10 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SmartResourceDispatcher.Core;
 
-internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders, WerArchive, WerQueue, FontCache }
+internal enum CleanupCategory
+{
+    Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders, WerArchive, WerQueue, FontCache, NvidiaShaders
+}
 
 internal sealed record TempFile(string Path, long Bytes, DateTime LastWriteUtc);
 
@@ -54,6 +57,12 @@ internal static class DiskCleaner
                 return ScanTargets([new(Path.Combine(localAppData, "Microsoft", "Windows", "Explorer"), pattern)], cutoffUtc);
             case CleanupCategory.DirectXShaders:
                 return Scan([Path.Combine(localAppData, "D3DSCache")], cutoffUtc);
+            case CleanupCategory.NvidiaShaders:
+                return Scan(
+                [
+                    Path.Combine(localAppData, "NVIDIA", "DXCache"),
+                    Path.Combine(localAppData, "NVIDIA", "GLCache")
+                ], cutoffUtc);
             default:
                 throw new ArgumentOutOfRangeException(nameof(category));
         }

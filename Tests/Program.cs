@@ -13,6 +13,7 @@ if (args is ["--cache-preview"])
 {
     CheckExplorerCache();
     CheckDirectXCache();
+    CheckNvidiaCaches();
     CheckWindowsReports();
     CheckFontCache();
     return;
@@ -21,6 +22,7 @@ if (args is ["--cache-preview"])
 CheckTempCleanup();
 CheckExplorerCache();
 CheckDirectXCache();
+CheckNvidiaCaches();
 CheckWindowsReports();
 CheckFontCache();
 CheckTweakRestore();
@@ -134,6 +136,39 @@ static void CheckDirectXCache()
         Require(File.Exists(oldShader) && File.Exists(freshShader) && File.Exists(vendorShader),
             "DirectX preview must not remove files.");
         Console.WriteLine("PASS DirectX shader cache preview");
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckNvidiaCaches()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
+    try
+    {
+        var nvidia = scratch.CreateSubdirectory("NVIDIA");
+        var dx = nvidia.CreateSubdirectory("DXCache");
+        var gl = nvidia.CreateSubdirectory("GLCache");
+        string dxShader = Path.Combine(dx.FullName, "dx.bin");
+        string glShader = Path.Combine(gl.CreateSubdirectory("game").FullName, "gl.bin");
+        string freshShader = Path.Combine(gl.FullName, "fresh.bin");
+        string otherNvidia = Path.Combine(nvidia.CreateSubdirectory("OtherCache").FullName, "other.bin");
+        string directX = Path.Combine(scratch.CreateSubdirectory("D3DSCache").FullName, "directx.bin");
+        DateTime now = new(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        foreach (string path in new[] { dxShader, glShader, freshShader, otherNvidia, directX })
+        {
+            File.WriteAllText(path, "shader");
+            File.SetLastWriteTimeUtc(path, now.AddDays(path == freshShader ? -1 : -2));
+        }
+
+        var preview = DiskCleaner.ScanLocalCache(CleanupCategory.NvidiaShaders, scratch.FullName, now.AddDays(-1));
+        Require(preview.Candidates.Count == 2 && preview.Candidates.Any(file => file.Path == dxShader) &&
+            preview.Candidates.Any(file => file.Path == glShader) && preview.RecentFiles == 1,
+            "NVIDIA preview must include old DXCache and GLCache files only, not fresh files, sibling NVIDIA folders, or D3DSCache.");
+        Require(File.Exists(dxShader) && File.Exists(glShader), "NVIDIA preview must not remove shaders.");
+        Console.WriteLine("PASS NVIDIA shader cache preview");
     }
     finally
     {
