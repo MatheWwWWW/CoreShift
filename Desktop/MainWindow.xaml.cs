@@ -5,7 +5,6 @@ using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Security.Principal;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -59,7 +58,7 @@ public partial class MainWindow : Window
     private bool installingUpdate;
     private AppRelease? availableUpdate;
 
-    public MainWindow()
+    internal MainWindow(bool isElevated)
     {
         InitializeComponent();
         CleanTemp.Checked += CleanCategoryChanged;
@@ -78,8 +77,7 @@ public partial class MainWindow : Window
         CleanWerQueue.Unchecked += CleanCategoryChanged;
         CleanFontCache.Checked += CleanCategoryChanged;
         CleanFontCache.Unchecked += CleanCategoryChanged;
-        using var identity = WindowsIdentity.GetCurrent();
-        isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+        this.isElevated = isElevated;
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
         ProfileEvents.ItemsSource = profileEvents;
 
@@ -90,7 +88,7 @@ public partial class MainWindow : Window
         trayIcon = new Tray.NotifyIcon
         {
             Icon = appIcon ?? System.Drawing.SystemIcons.Application,
-            Text = "CoreShift",
+            Text = isElevated ? "CoreShift (администратор)" : "CoreShift",
             ContextMenuStrip = trayMenu,
             Visible = true
         };
@@ -779,7 +777,7 @@ public partial class MainWindow : Window
         Activate();
     }
 
-    private async Task ExitAsync()
+    internal async Task ExitAsync()
     {
         if (!closing && await PrepareToExitAsync())
             CloseForExit();
