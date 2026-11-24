@@ -14,6 +14,7 @@ if (args is ["--cache-preview"])
     CheckExplorerCache();
     CheckDirectXCache();
     CheckWindowsReports();
+    CheckFontCache();
     return;
 }
 
@@ -21,6 +22,7 @@ CheckTempCleanup();
 CheckExplorerCache();
 CheckDirectXCache();
 CheckWindowsReports();
+CheckFontCache();
 CheckTweakRestore();
 CheckPagefileAdvice();
 CheckContextProfile();
@@ -164,6 +166,47 @@ static void CheckWindowsReports()
             "Queued report preview must exclude the archive, other WER folders, and files not older than 30 days.");
         Require(File.Exists(archived) && File.Exists(queued), "WER preview must not remove reports.");
         Console.WriteLine("PASS Windows error report previews");
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckFontCache()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
+    try
+    {
+        string windows = scratch.FullName;
+        var serviceCache = Directory.CreateDirectory(Path.Combine(windows, "ServiceProfiles", "LocalService", "AppData", "Local", "FontCache"));
+        var system = scratch.CreateSubdirectory("System32");
+        string serviceFont = Path.Combine(serviceCache.FullName, "fOnTcAcHe-System.dAt");
+        string systemFont = Path.Combine(system.FullName, "FNTCACHE.DAT");
+        string locked = Path.Combine(serviceCache.FullName, "FontCache-locked.dat");
+        string[] excluded =
+        [
+            Path.Combine(serviceCache.FullName, "FontCache-System.dat.bak"),
+            Path.Combine(serviceCache.FullName, "unrelated.dat"),
+            Path.Combine(serviceCache.CreateSubdirectory("nested").FullName, "FontCache-nested.dat"),
+            Path.Combine(system.FullName, "FontCache-other.dat"),
+            Path.Combine(system.CreateSubdirectory("nested").FullName, "FNTCACHE.DAT"),
+            Path.Combine(scratch.CreateSubdirectory("Fonts").FullName, "example.ttf")
+        ];
+        foreach (string path in excluded)
+            File.WriteAllText(path, "leave intact");
+        File.WriteAllText(serviceFont, "cache");
+        File.WriteAllText(systemFont, "cache");
+        File.WriteAllText(locked, "cache");
+
+        using var openCache = File.Open(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var preview = DiskCleaner.ScanWindowsFontCache(windows);
+        Require(preview.Candidates.Count == 2 && preview.Candidates.Any(file => file.Path == systemFont) &&
+            preview.Candidates.Any(file => file.Path == serviceFont),
+            "Font cache preview must include only the exact system cache and unlocked top-level service cache databases.");
+        Require(File.Exists(serviceFont) && File.Exists(systemFont) && excluded.All(File.Exists),
+            "Font cache preview must not remove files.");
+        Console.WriteLine("PASS Windows font cache preview");
     }
     finally
     {

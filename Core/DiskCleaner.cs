@@ -1,10 +1,11 @@
+using System.IO.Enumeration;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace SmartResourceDispatcher.Core;
 
-internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders, WerArchive, WerQueue }
+internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders, WerArchive, WerQueue, FontCache }
 
 internal sealed record TempFile(string Path, long Bytes, DateTime LastWriteUtc);
 
@@ -16,6 +17,8 @@ internal sealed record CleanResult(int DeletedFiles, long DeletedBytes, int Busy
 
 internal static class DiskCleaner
 {
+    private readonly record struct ScanTarget(string Path, string? Pattern = null, bool IsFile = false);
+
     private static readonly TempScanReport UnavailableRoot = new([], [], 0, 0, 0, 1, 0, 0);
 
     internal static TempScanReport ScanTempFolders() =>
@@ -27,6 +30,8 @@ internal static class DiskCleaner
         if (category is CleanupCategory.WerArchive or CleanupCategory.WerQueue)
             return ScanWindowsReports(category,
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), nowUtc);
+        if (category == CleanupCategory.FontCache)
+            return ScanWindowsFontCache(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
 
         DateTime cutoffUtc = nowUtc.AddDays(-1);
         if (category == CleanupCategory.Temp)
@@ -45,8 +50,8 @@ internal static class DiskCleaner
         {
             case CleanupCategory.ExplorerThumbnails:
             case CleanupCategory.ExplorerIcons:
-                string prefix = category == CleanupCategory.ExplorerThumbnails ? "thumbcache_" : "iconcache_";
-                return Scan([Path.Combine(localAppData, "Microsoft", "Windows", "Explorer")], cutoffUtc, prefix);
+                string pattern = category == CleanupCategory.ExplorerThumbnails ? "thumbcache_*.db" : "iconcache_*.db";
+                return ScanTargets([new(Path.Combine(localAppData, "Microsoft", "Windows", "Explorer"), pattern)], cutoffUtc);
             case CleanupCategory.DirectXShaders:
                 return Scan([Path.Combine(localAppData, "D3DSCache")], cutoffUtc);
             default:
@@ -68,6 +73,18 @@ internal static class DiskCleaner
         return Scan([Path.Combine(programData, "Microsoft", "Windows", "WER", folder)], nowUtc.AddDays(-30));
     }
 
+    internal static TempScanReport ScanWindowsFontCache(string windows)
+    {
+        if (!Path.IsPathFullyQualified(windows))
+            return UnavailableRoot;
+
+        return ScanTargets(
+        [
+            new(Path.Combine(windows, "ServiceProfiles", "LocalService", "AppData", "Local", "FontCache"), "FontCache*.dat"),
+            new(Path.Combine(windows, "System32", "FNTCACHE.DAT"), IsFile: true)
+        ], DateTime.MaxValue);
+    }
+
     private static IEnumerable<string> GetTargetTempPaths()
     {
         yield return Path.GetTempPath();
@@ -77,94 +94,112 @@ internal static class DiskCleaner
     }
 
     internal static TempScanReport Scan(IEnumerable<string> folders, DateTime cutoffUtc)
-        => Scan(folders, cutoffUtc, explorerPrefix: null);
+        => ScanTargets(folders.Select(path => new ScanTarget(path)), cutoffUtc);
 
-    private static TempScanReport Scan(IEnumerable<string> folders, DateTime cutoffUtc, string? explorerPrefix)
+    private static TempScanReport ScanTargets(IEnumerable<ScanTarget> locations, DateTime cutoffUtc)
     {
-        string[] roots = folders.Select(path => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)))
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var targets = locations.Select(target => target with { Path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(target.Path)) })
+            .DistinctBy(target => target.Path, StringComparer.OrdinalIgnoreCase);
+        var roots = new List<string>();
         var candidates = new List<TempFile>();
         long total = 0;
         int busy = 0, unavailableFiles = 0, unavailableFolders = 0, links = 0, recent = 0;
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pending = new Stack<string>();
+        var pending = new Stack<ScanTarget>();
 
-        foreach (string root in roots)
+        foreach (var target in targets)
         {
-            if (Path.GetDirectoryName(root) is null)
+            roots.Add(target.Path);
+            if (Path.GetDirectoryName(target.Path) is null)
                 unavailableFolders++;
             else
-                pending.Push(root);
+                pending.Push(target);
         }
 
-        while (pending.TryPop(out string? folder))
+        while (pending.TryPop(out var target))
         {
-            if (!visited.Add(folder))
+            if (!visited.Add(target.Path))
                 continue;
 
             try
             {
+                string folder = target.IsFile ? Path.GetDirectoryName(target.Path)! : target.Path;
                 if (HasLinkedAncestor(folder))
                 {
                     links++;
                     continue;
                 }
 
+                if (target.IsFile)
+                {
+                    Examine(new FileInfo(target.Path), recurse: false);
+                    continue;
+                }
+
                 foreach (var entry in new DirectoryInfo(folder).EnumerateFileSystemInfos())
                 {
-                    try
-                    {
-                        if (explorerPrefix is not null &&
-                            (entry is not FileInfo ||
-                             !entry.Name.StartsWith(explorerPrefix, StringComparison.OrdinalIgnoreCase) ||
-                             !entry.Name.EndsWith(".db", StringComparison.OrdinalIgnoreCase)))
-                            continue;
+                    if (target.Pattern is { } pattern &&
+                        (entry is not FileInfo || !FileSystemName.MatchesSimpleExpression(pattern, entry.Name, ignoreCase: true)))
+                        continue;
 
-                        FileAttributes attributes = entry.Attributes;
-                        if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                        {
-                            links++;
-                            continue;
-                        }
-
-                        if (entry is DirectoryInfo)
-                        {
-                            pending.Push(entry.FullName);
-                            continue;
-                        }
-
-                        var file = (FileInfo)entry;
-                        long size = file.Length;
-                        total += size;
-                        DateTime lastWriteUtc = file.LastWriteTimeUtc;
-                        if (lastWriteUtc >= cutoffUtc)
-                        {
-                            recent++;
-                            continue;
-                        }
-
-                        if (attributes.HasFlag(FileAttributes.ReadOnly))
-                        {
-                            unavailableFiles++;
-                            continue;
-                        }
-
-                        CheckFileSharing(file);
-                        candidates.Add(new TempFile(file.FullName, size, lastWriteUtc));
-                    }
-                    catch (IOException ex) when (IsSharingViolation(ex))
-                    {
-                        busy++;
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        unavailableFiles++;
-                    }
+                    Examine(entry, recurse: target.Pattern is null);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 unavailableFolders++;
+            }
+        }
+
+        void Examine(FileSystemInfo entry, bool recurse)
+        {
+            try
+            {
+                FileAttributes attributes = entry.Attributes;
+                if (attributes == (FileAttributes)(-1))
+                {
+                    unavailableFiles++;
+                    return;
+                }
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    links++;
+                    return;
+                }
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    if (recurse)
+                        pending.Push(new ScanTarget(entry.FullName));
+                    else
+                        unavailableFiles++;
+                    return;
+                }
+
+                var file = (FileInfo)entry;
+                long size = file.Length;
+                total += size;
+                DateTime lastWriteUtc = file.LastWriteTimeUtc;
+                if (lastWriteUtc >= cutoffUtc)
+                {
+                    recent++;
+                    return;
+                }
+                if ((attributes & FileAttributes.ReadOnly) != 0)
+                {
+                    unavailableFiles++;
+                    return;
+                }
+
+                CheckFileSharing(file);
+                candidates.Add(new TempFile(file.FullName, size, lastWriteUtc));
+            }
+            catch (IOException ex) when (IsSharingViolation(ex))
+            {
+                busy++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                unavailableFiles++;
             }
         }
 

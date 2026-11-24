@@ -63,6 +63,8 @@ public partial class MainWindow : Window
         CleanWerArchive.Unchecked += CleanCategoryChanged;
         CleanWerQueue.Checked += CleanCategoryChanged;
         CleanWerQueue.Unchecked += CleanCategoryChanged;
+        CleanFontCache.Checked += CleanCategoryChanged;
+        CleanFontCache.Unchecked += CleanCategoryChanged;
         using var identity = WindowsIdentity.GetCurrent();
         isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
@@ -285,7 +287,7 @@ public partial class MainWindow : Window
 
     private bool HasCleanSelection => CleanTemp.IsChecked == true ||
         CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true || CleanDirectX.IsChecked == true ||
-        CleanWerArchive.IsChecked == true || CleanWerQueue.IsChecked == true;
+        CleanWerArchive.IsChecked == true || CleanWerQueue.IsChecked == true || CleanFontCache.IsChecked == true;
 
     private void CleanCategoryChanged(object sender, RoutedEventArgs e)
     {
@@ -310,7 +312,7 @@ public partial class MainWindow : Window
         if (closing || !ScanButton.IsEnabled)
             return;
 
-        var selected = new List<(CleanupCategory Category, string Name)>(6);
+        var selected = new List<(CleanupCategory Category, string Name)>(7);
         if (CleanTemp.IsChecked == true)
             selected.Add((CleanupCategory.Temp, (string)CleanTemp.Content));
         if (CleanThumbnails.IsChecked == true)
@@ -323,6 +325,8 @@ public partial class MainWindow : Window
             selected.Add((CleanupCategory.WerArchive, (string)CleanWerArchive.Content));
         if (CleanWerQueue.IsChecked == true)
             selected.Add((CleanupCategory.WerQueue, (string)CleanWerQueue.Content));
+        if (CleanFontCache.IsChecked == true)
+            selected.Add((CleanupCategory.FontCache, (string)CleanFontCache.Content));
         int selectionVersion = cleanSelectionVersion;
 
         ClearScan();
@@ -380,7 +384,7 @@ public partial class MainWindow : Window
             includesWerQueue |= category == CleanupCategory.WerQueue && report.Candidates.Count > 0;
             categories[i] = new CleanCategoryRow(
                 $"{name} — к удалению: {categoryCount:N0} · {DiskCleaner.FormatBytes(categoryBytes)}",
-                $"Папки: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
+                $"Пути: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
                 $"Пропущено: свежих {report.RecentFiles}, занятых {report.BusyFiles}, недоступных файлов {report.UnavailableFiles}, " +
                 $"недоступных папок {report.UnavailableFolders}, ссылок {report.SkippedLinks}.");
         }
