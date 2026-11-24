@@ -9,14 +9,16 @@ if (args is ["--idle"])
     return;
 }
 
-if (args is ["--explorer-cache"])
+if (args is ["--cache-preview"])
 {
     CheckExplorerCache();
+    CheckDirectXCache();
     return;
 }
 
 CheckTempCleanup();
 CheckExplorerCache();
+CheckDirectXCache();
 CheckTweakRestore();
 CheckPagefileAdvice();
 CheckContextProfile();
@@ -66,8 +68,8 @@ static void CheckExplorerCache()
     var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
     try
     {
-        string root = scratch.FullName;
-        string nested = scratch.CreateSubdirectory("nested").FullName;
+        string root = Directory.CreateDirectory(Path.Combine(scratch.FullName, "Microsoft", "Windows", "Explorer")).FullName;
+        string nested = Directory.CreateDirectory(Path.Combine(root, "nested")).FullName;
         string thumbnail = Path.Combine(root, "THUMBCACHE_96.DB");
         string icon = Path.Combine(root, "iCoNcAcHe_32.dB");
         string recent = Path.Combine(root, "thumbcache_recent.db");
@@ -91,14 +93,43 @@ static void CheckExplorerCache()
         File.SetLastWriteTimeUtc(recent, now);
 
         DateTime cutoff = now.AddDays(-1);
-        var thumbnails = DiskCleaner.ScanExplorerCache(root, CleanupCategory.ExplorerThumbnails, cutoff);
-        var icons = DiskCleaner.ScanExplorerCache(root, CleanupCategory.ExplorerIcons, cutoff);
+        var thumbnails = DiskCleaner.ScanLocalCache(CleanupCategory.ExplorerThumbnails, scratch.FullName, cutoff);
+        var icons = DiskCleaner.ScanLocalCache(CleanupCategory.ExplorerIcons, scratch.FullName, cutoff);
         Require(thumbnails.Candidates.Count == 1 && thumbnails.Candidates[0].Path == thumbnail && thumbnails.RecentFiles == 1,
             "Thumbnail preview should include only old top-level thumbnail databases and count the recent match.");
         Require(icons.Candidates.Count == 1 && icons.Candidates[0].Path == icon && icons.RecentFiles == 0,
             "Icon preview should include only old top-level icon databases.");
         Require(File.Exists(thumbnail) && File.Exists(icon), "Explorer preview removed a file.");
         Console.WriteLine("PASS Explorer cache preview");
+    }
+    finally
+    {
+        scratch.Delete(recursive: true);
+    }
+}
+
+static void CheckDirectXCache()
+{
+    var scratch = Directory.CreateTempSubdirectory("CoreShift-check-");
+    try
+    {
+        var cache = scratch.CreateSubdirectory("D3DSCache");
+        string oldShader = Path.Combine(cache.CreateSubdirectory("game").FullName, "old.bin");
+        string freshShader = Path.Combine(cache.FullName, "fresh.bin");
+        string vendorShader = Path.Combine(scratch.CreateSubdirectory("NVIDIA/DXCache").FullName, "outside.bin");
+        DateTime now = DateTime.UtcNow;
+        foreach (string path in new[] { oldShader, freshShader, vendorShader })
+        {
+            File.WriteAllText(path, "shader");
+            File.SetLastWriteTimeUtc(path, path == freshShader ? now : now.AddDays(-2));
+        }
+
+        var preview = DiskCleaner.ScanLocalCache(CleanupCategory.DirectXShaders, scratch.FullName, now.AddDays(-1));
+        Require(preview.Candidates.Count == 1 && preview.Candidates[0].Path == oldShader && preview.RecentFiles == 1,
+            "DirectX preview should include old shaders inside D3DSCache, not recent files or vendor caches.");
+        Require(File.Exists(oldShader) && File.Exists(freshShader) && File.Exists(vendorShader),
+            "DirectX preview must not remove files.");
+        Console.WriteLine("PASS DirectX shader cache preview");
     }
     finally
     {

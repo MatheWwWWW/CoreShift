@@ -56,6 +56,8 @@ public partial class MainWindow : Window
         CleanThumbnails.Unchecked += CleanCategoryChanged;
         CleanIcons.Checked += CleanCategoryChanged;
         CleanIcons.Unchecked += CleanCategoryChanged;
+        CleanDirectX.Checked += CleanCategoryChanged;
+        CleanDirectX.Unchecked += CleanCategoryChanged;
         using var identity = WindowsIdentity.GetCurrent();
         isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
@@ -277,7 +279,7 @@ public partial class MainWindow : Window
     }
 
     private bool HasCleanSelection => CleanTemp.IsChecked == true ||
-        CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true;
+        CleanThumbnails.IsChecked == true || CleanIcons.IsChecked == true || CleanDirectX.IsChecked == true;
 
     private void CleanCategoryChanged(object sender, RoutedEventArgs e)
     {
@@ -302,13 +304,15 @@ public partial class MainWindow : Window
         if (closing || !ScanButton.IsEnabled)
             return;
 
-        var selected = new List<(CleanupCategory Category, string Name)>(3);
+        var selected = new List<(CleanupCategory Category, string Name)>(4);
         if (CleanTemp.IsChecked == true)
             selected.Add((CleanupCategory.Temp, (string)CleanTemp.Content));
         if (CleanThumbnails.IsChecked == true)
             selected.Add((CleanupCategory.ExplorerThumbnails, (string)CleanThumbnails.Content));
         if (CleanIcons.IsChecked == true)
             selected.Add((CleanupCategory.ExplorerIcons, (string)CleanIcons.Content));
+        if (CleanDirectX.IsChecked == true)
+            selected.Add((CleanupCategory.DirectXShaders, (string)CleanDirectX.Content));
         int selectionVersion = cleanSelectionVersion;
 
         ClearScan();
@@ -350,19 +354,23 @@ public partial class MainWindow : Window
         {
             var (category, name) = selected[i];
             var report = DiskCleaner.ScanCategory(category);
-            categories[i] = new CleanCategoryRow(
-                $"{name} — к удалению: {report.Candidates.Count:N0} · {DiskCleaner.FormatBytes(report.TotalBytes)}",
-                $"Папки: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
-                $"Пропущено: свежих {report.RecentFiles}, занятых {report.BusyFiles}, недоступных файлов {report.UnavailableFiles}, " +
-                $"недоступных папок {report.UnavailableFolders}, ссылок {report.SkippedLinks}.");
+            int categoryCount = 0;
+            long categoryBytes = 0;
             foreach (var file in report.Candidates)
             {
                 if (!paths.Add(file.Path))
                     continue;
                 candidates.Add(file);
                 files.Add(new CleanRow(file.Path, DiskCleaner.FormatBytes(file.Bytes)));
-                totalBytes += file.Bytes;
+                categoryCount++;
+                categoryBytes += file.Bytes;
             }
+            totalBytes += categoryBytes;
+            categories[i] = new CleanCategoryRow(
+                $"{name} — к удалению: {categoryCount:N0} · {DiskCleaner.FormatBytes(categoryBytes)}",
+                $"Папки: {(report.Roots.Count > 0 ? string.Join(", ", report.Roots) : "нет доступных путей")}",
+                $"Пропущено: свежих {report.RecentFiles}, занятых {report.BusyFiles}, недоступных файлов {report.UnavailableFiles}, " +
+                $"недоступных папок {report.UnavailableFolders}, ссылок {report.SkippedLinks}.");
         }
 
         return new CleanPreview(candidates, files, categories, totalBytes);

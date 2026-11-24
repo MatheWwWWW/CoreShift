@@ -281,10 +281,12 @@
                                     <CheckBox x:Name="CleanThumbnails" Content="Миниатюры Проводника"
                                               Foreground="{StaticResource Text}" Margin="0,0,16,8" />
                                     <CheckBox x:Name="CleanIcons" Content="Кэш иконок"
+                                              Foreground="{StaticResource Text}" Margin="0,0,16,8" />
+                                    <CheckBox x:Name="CleanDirectX" Content="Кэш шейдеров DirectX"
                                               Foreground="{StaticResource Text}" Margin="0,0,0,8" />
                                 </WrapPanel>
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
-                                           Text="Windows восстановит кэш Проводника по мере необходимости. Занятые файлы пропускаются." />
+                                           Text="Занятые файлы пропускаются. Windows пересоздаст кэши Проводника. После очистки кэша DirectX первые запуски игр могут подтормаживать, пока шейдеры компилируются заново." />
                                 <WrapPanel>
                                     <Button x:Name="ScanButton" Content="Сканировать" Style="{StaticResource PrimaryButton}" Click="ScanClick" Margin="0,0,8,0" />
                                     <Button x:Name="DeleteButton" Content="Удалить найденное" IsEnabled="False" Click="DeleteClick" />

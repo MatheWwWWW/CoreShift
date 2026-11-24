@@ -4,7 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SmartResourceDispatcher.Core;
 
-internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons }
+internal enum CleanupCategory { Temp, ExplorerThumbnails, ExplorerIcons, DirectXShaders }
 
 internal sealed record TempFile(string Path, long Bytes, DateTime LastWriteUtc);
 
@@ -22,32 +22,29 @@ internal static class DiskCleaner
     internal static TempScanReport ScanCategory(CleanupCategory category)
     {
         DateTime cutoffUtc = DateTime.UtcNow.AddDays(-1);
+        if (category == CleanupCategory.Temp)
+            return Scan(GetTargetTempPaths(), cutoffUtc);
+
+        return ScanLocalCache(category,
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), cutoffUtc);
+    }
+
+    internal static TempScanReport ScanLocalCache(CleanupCategory category, string localAppData, DateTime cutoffUtc)
+    {
+        if (!Path.IsPathFullyQualified(localAppData))
+            return new TempScanReport([], [], 0, 0, 0, 1, 0, 0);
+
         switch (category)
         {
-            case CleanupCategory.Temp:
-                return Scan(GetTargetTempPaths(), cutoffUtc);
             case CleanupCategory.ExplorerThumbnails:
             case CleanupCategory.ExplorerIcons:
-                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                if (!Path.IsPathFullyQualified(localAppData))
-                    return new TempScanReport([], [], 0, 0, 0, 1, 0, 0);
-
-                return ScanExplorerCache(Path.Combine(localAppData, "Microsoft", "Windows", "Explorer"), category, cutoffUtc);
+                string prefix = category == CleanupCategory.ExplorerThumbnails ? "thumbcache_" : "iconcache_";
+                return Scan([Path.Combine(localAppData, "Microsoft", "Windows", "Explorer")], cutoffUtc, prefix);
+            case CleanupCategory.DirectXShaders:
+                return Scan([Path.Combine(localAppData, "D3DSCache")], cutoffUtc);
             default:
                 throw new ArgumentOutOfRangeException(nameof(category));
         }
-    }
-
-    internal static TempScanReport ScanExplorerCache(string explorerFolder, CleanupCategory category, DateTime cutoffUtc)
-    {
-        string prefix = category switch
-        {
-            CleanupCategory.ExplorerThumbnails => "thumbcache_",
-            CleanupCategory.ExplorerIcons => "iconcache_",
-            _ => throw new ArgumentOutOfRangeException(nameof(category))
-        };
-
-        return Scan([explorerFolder], cutoffUtc, prefix);
     }
 
     private static IEnumerable<string> GetTargetTempPaths()
