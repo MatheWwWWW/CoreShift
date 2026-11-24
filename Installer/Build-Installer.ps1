@@ -45,6 +45,8 @@ try {
         '-r', 'win-x64', '--self-contained', '--disable-build-servers', '-m:1',
         '--artifacts-path', (Join-Path $workDir 'artifacts'), '--output', $publishDir,
         "-p:Version=$Version",
+        '-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true', '-p:EnableCompressionInSingleFile=true',
+        '-p:EnableSingleFileAnalyzer=false',
         "-p:RestorePackagesPath=$(Join-Path $stagingRoot 'packages')",
         "-p:NuGetLockFilePath=$(Join-Path $workDir 'packages.lock.json')",
         '-p:RestorePackagesWithLockFile=false'

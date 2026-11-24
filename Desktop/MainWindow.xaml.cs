@@ -3,11 +3,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
-using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Principal;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -137,7 +135,7 @@ public partial class MainWindow : Window
             if (update is not null)
                 SetStatus(UpdateStatus, $"Версия {update.Version}");
         }
-        catch (Exception ex) when (IsUpdateError(ex))
+        catch (Exception ex) when (AppUpdater.IsUpdateError(ex))
         {
             Debug.WriteLine(ex);
         }
@@ -154,43 +152,26 @@ public partial class MainWindow : Window
 
         installingUpdate = true;
         InstallUpdateButton.IsEnabled = false;
-        SetStatus(UpdateStatus, $"Загружаем версию {update.Version}…");
-        string? installerPath = null;
-        bool preparingExit = false;
-        bool launched = false;
+        SetStatus(UpdateStatus, "Готовим окно обновления…");
         try
         {
-            installerPath = AppUpdater.CreateInstallerPath();
-            using var installer = await AppUpdater.DownloadAsync(update, installerPath, updateLifetime.Token);
-            if (closing)
-                return;
-
-            SetStatus(UpdateStatus, "Завершаем операции перед установкой…");
-            preparingExit = true;
             if (!await PrepareToExitAsync())
             {
                 SetStatus(UpdateStatus, "Не удалось восстановить приоритет процесса. Повторите установку после проверки профиля.", error: true);
                 return;
             }
 
-            AppUpdater.LaunchInstaller(installer.Name);
-            launched = true;
+            await AppUpdater.StartWorkerAsync(update.Version);
             CloseForExit();
         }
-        catch (Exception ex) when (IsUpdateError(ex))
+        catch (Exception ex) when (AppUpdater.IsUpdateError(ex))
         {
             Debug.WriteLine(ex);
-            if (!updateLifetime.IsCancellationRequested)
-            {
-                if (preparingExit && closing)
-                    CancelExit();
-                SetStatus(UpdateStatus, "Не удалось подготовить обновление. Нажмите «Установить», чтобы повторить.", error: true);
-            }
+            CancelExit();
+            SetStatus(UpdateStatus, "Не удалось открыть окно обновления. Попробуйте ещё раз.", error: true);
         }
         finally
         {
-            if (!launched && installerPath is not null)
-                AppUpdater.TryDeleteInstaller(installerPath);
             installingUpdate = false;
             InstallUpdateButton.IsEnabled = true;
         }
@@ -894,9 +875,6 @@ public partial class MainWindow : Window
 
     private static bool IsSystemError(Exception ex) => ex is ArgumentException or InvalidOperationException
         or IOException or UnauthorizedAccessException or SecurityException or Win32Exception or ManagementException or COMException;
-
-    private static bool IsUpdateError(Exception ex) => IsSystemError(ex)
-        || ex is HttpRequestException or JsonException or InvalidDataException or OperationCanceledException;
 
     private static string FormatBytes(ulong? bytes) => bytes is { } value ? DiskCleaner.FormatBytes((long)value) : "—";
     private static string FormatMiB(uint? mib) => FormatBytes(mib is { } value ? (ulong)value * 1024 * 1024 : null);

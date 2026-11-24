@@ -4,7 +4,7 @@
     <TargetFramework>net11.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <ApplicationIcon>CoreShift.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -14,4 +14,17 @@
     <Using Remove="System.Windows.Forms" />
     <ProjectReference Include="../SmartResourceDispatcher.csproj" />
   </ItemGroup>
+  <Target Name="ConfigureDesktopBundle" BeforeTargets="_ComputeFilesToBundle">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.runtimeconfig.json'
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.deps.json'
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'SmartResourceDispatcher.exe'" />
+      <!-- .NET 11 WPF needs these mixed-mode files on disk. https://github.com/dotnet/wpf/issues/11842 -->
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" ExcludeFromSingleFile="true"
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'DirectWriteForwarder.dll'
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'System.Printing.dll'
+                  or '%(ResolvedFileToPublish.RelativePath)' == 'ijwhost.dll'" />
+    </ItemGroup>
+  </Target>
 </Project>
