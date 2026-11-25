@@ -4,13 +4,14 @@ using System.Runtime.InteropServices;
 
 namespace SmartResourceDispatcher.Core;
 
-internal sealed class ContextProfileManager(string processName, ProcessPriorityClass priority)
+internal sealed class ContextProfileManager(string processName, ProcessPriorityClass priority, bool useGamePowerPlan = false)
 {
     private sealed record ActiveProcess(Process Process, ProcessPriorityClass OriginalPriority);
 
     private ActiveProcess? active;
     private int? observedPid;
     private bool reportedRestoreFailure;
+    private GamePowerProfile? powerProfile;
 
     internal static string NormalizeProcessName(string name)
     {
@@ -25,6 +26,7 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
     internal bool Watch(CancellationToken stop, Action started, Action<string> report)
     {
         using var mutex = new Mutex(false, @"Local\SmartResourceDispatcher.ContextProfile");
+        using var powerMutex = useGamePowerPlan ? new Mutex(false, @"Global\SmartResourceDispatcher.GamePowerPlan") : null;
         try
         {
             if (!mutex.WaitOne(0))
@@ -36,19 +38,43 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
         }
 
         bool restored = false;
+        bool ownsPowerMutex = false;
         try
         {
+            if (powerMutex is not null)
+            {
+                try { ownsPowerMutex = powerMutex.WaitOne(0); }
+                catch (AbandonedMutexException) { ownsPowerMutex = true; }
+                if (!ownsPowerMutex)
+                    throw new InvalidOperationException("Планом питания уже управляет другой профиль CoreShift.");
+                if (!GamePowerProfile.IsAvailable())
+                    throw new InvalidOperationException("В Windows не найден план «Высокая производительность».");
+                powerProfile = new GamePowerProfile();
+            }
+
             started();
             while (!stop.IsCancellationRequested)
             {
                 Observe(ReadForegroundProcessId(), report);
+                powerProfile?.Update(report);
                 stop.WaitHandle.WaitOne(250);
             }
         }
         finally
         {
-            try { restored = Restore(report); }
-            finally { mutex.ReleaseMutex(); }
+            try
+            {
+                restored = Restore(report);
+            }
+            finally
+            {
+                restored &= powerProfile?.Restore(report) ?? true;
+                powerProfile?.Dispose();
+                powerProfile = null;
+                if (ownsPowerMutex)
+                    powerMutex!.ReleaseMutex();
+                mutex.ReleaseMutex();
+            }
         }
 
         return restored;
@@ -75,6 +101,7 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
 
             // Keep the handle to the same process instance until the priority is restored.
             _ = process.SafeHandle;
+            powerProfile?.Track(process);
             ProcessPriorityClass original = process.PriorityClass;
             if (original == priority)
                 return;

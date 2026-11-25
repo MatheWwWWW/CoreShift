@@ -1,0 +1,11 @@
+LibreHardwareMonitorLib 0.9.6
+Copyright (C) LibreHardwareMonitor and Contributors.
+Portions Copyright (C) Michael Möller and Contributors.
+Licensed under the Mozilla Public License 2.0.
+License: https://www.mozilla.org/MPL/2.0/
+Source: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/tree/v0.9.6
+Upstream notices: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/v0.9.6/THIRD-PARTY-NOTICES.txt
+
+LibreHardwareMonitorLib includes PawnIO modules under the GNU Lesser General Public License 2.1.
+License: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+Module source: https://github.com/namazso/PawnIO.Modules

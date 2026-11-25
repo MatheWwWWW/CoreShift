@@ -23,7 +23,6 @@ public partial class MainWindow : Window
         string Advice, bool HasErrors);
 
     private sealed record PagefileRow(string Name, string Usage);
-    private sealed record PcInfoRow(string Label, string Value);
     private sealed record CleanRow(string Path, string Size);
     private sealed record CleanCategoryRow(string Heading, string Roots, string Skipped);
     private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories,
@@ -34,6 +33,13 @@ public partial class MainWindow : Window
         public string Name => Tweak.Name;
         public string Description => Tweak.Description;
         public string Risk => Tweak.Risk;
+        public string? SettingsUri => Tweak.Id switch
+        {
+            "advertising-id" => "ms-settings:privacy-general",
+            "search-highlights" when OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) => "ms-settings:search-permissions",
+            "recent-apps" => "ms-settings:personalization-start",
+            _ => null
+        };
     }
 
     private readonly bool isElevated;
@@ -41,6 +47,7 @@ public partial class MainWindow : Window
     private readonly Tray.ContextMenuStrip trayMenu = new();
     private readonly System.Drawing.Icon? appIcon;
     private readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
+    private readonly DispatcherTimer overviewTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly CancellationTokenSource updateLifetime = new();
     private readonly HashSet<Task> pendingOperations = [];
     private readonly ObservableCollection<string> profileEvents = [];
@@ -49,6 +56,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? profileStop;
     private Task<bool>? profileTask;
     private bool loadingPcInfo;
+    private bool refreshingOverview;
+    private Overview? lastOverview;
     private bool loadingTweaks;
     private bool loadingProfileApplications;
     private bool closing;
@@ -78,6 +87,7 @@ public partial class MainWindow : Window
         CleanFontCache.Checked += CleanCategoryChanged;
         CleanFontCache.Unchecked += CleanCategoryChanged;
         this.isElevated = isElevated;
+        InitializePerformanceControls();
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
         ProfileEvents.ItemsSource = profileEvents;
 
@@ -98,6 +108,8 @@ public partial class MainWindow : Window
                 ShowFromTray();
         };
         updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
+        overviewTimer.Tick += async (_, _) => await RefreshOverviewAsync();
+        OverviewPage.IsVisibleChanged += (_, _) => UpdateOverviewPolling();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -106,14 +118,12 @@ public partial class MainWindow : Window
             return;
 
         initialized = true;
+        UpdateOverviewPolling();
         if (AppUpdater.IsInstalledCopy())
         {
             updateTimer.Start();
-            await Task.WhenAll(RefreshOverviewAsync(), CheckForUpdatesAsync());
-            return;
+            await CheckForUpdatesAsync();
         }
-
-        await RefreshOverviewAsync();
     }
 
     private async Task CheckForUpdatesAsync()
@@ -185,12 +195,15 @@ public partial class MainWindow : Window
         MemoryPage.Visibility = VisibleWhen(ReferenceEquals(sender, MemoryNav));
         CleanPage.Visibility = VisibleWhen(ReferenceEquals(sender, CleanNav));
         TweaksPage.Visibility = VisibleWhen(ReferenceEquals(sender, TweaksNav));
+        PrivacyPage.Visibility = VisibleWhen(ReferenceEquals(sender, PrivacyNav));
         ProfilePage.Visibility = VisibleWhen(ReferenceEquals(sender, ProfileNav));
         PageScroll.ScrollToTop();
 
-        if (ReferenceEquals(sender, TweaksNav) && !loadingTweaks)
+        if (ReferenceEquals(sender, TweaksNav))
+            await Task.WhenAll(RefreshTweaksAsync(), RefreshPerformanceAsync());
+        else if (ReferenceEquals(sender, PrivacyNav))
             await RefreshTweaksAsync();
-        else if (ReferenceEquals(sender, PcInfoNav) && !loadingPcInfo && PcInfoItems.ItemsSource is null)
+        else if (ReferenceEquals(sender, PcInfoNav) && !loadingPcInfo)
             await LoadPcInfoAsync();
         else if (ReferenceEquals(sender, ProfileNav))
             await RefreshProfileApplicationsAsync();
@@ -198,89 +211,54 @@ public partial class MainWindow : Window
 
     private static Visibility VisibleWhen(bool condition) => condition ? Visibility.Visible : Visibility.Collapsed;
 
-    private async Task LoadPcInfoAsync()
-    {
-        loadingPcInfo = true;
-        try
-        {
-            PcInfoItems.ItemsSource = await RunInBackground(ReadPcInfo);
-            PcInfoStatus.Visibility = Visibility.Collapsed;
-        }
-        finally
-        {
-            loadingPcInfo = false;
-        }
-    }
-
-    private static PcInfoRow[] ReadPcInfo()
-    {
-        const string unavailable = "Недоступно";
-        string windows = ReadWmiValues("SELECT Caption FROM Win32_OperatingSystem", item => item["Caption"] as string)
-            ?? "Windows";
-
-        return
-        [
-            new("Имя компьютера", Environment.MachineName),
-            new("Операционная система", $"{windows} · сборка {Environment.OSVersion.Version.Build} · {RuntimeInformation.OSArchitecture}"),
-            new("Процессоры", ReadWmiValues("SELECT Name FROM Win32_Processor", item => item["Name"] as string) ?? unavailable),
-            new("Оперативная память", ReadWmiValues("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem",
-                item => item["TotalPhysicalMemory"] is ulong bytes && bytes > 0 ? FormatBytes(bytes) : null) ?? unavailable),
-            new("Видеоадаптеры", ReadWmiValues("SELECT Name FROM Win32_VideoController", item => item["Name"] as string) ?? unavailable),
-            new("Накопители", ReadWmiValues("SELECT Model, Size FROM Win32_DiskDrive", item =>
-            {
-                string? model = (item["Model"] as string)?.Trim();
-                return item["Size"] is ulong bytes && bytes > 0
-                    ? $"{(string.IsNullOrEmpty(model) ? "Накопитель" : model)} · {FormatBytes(bytes)}"
-                    : model;
-            }) ?? unavailable)
-        ];
-    }
-
-    private static string? ReadWmiValues(string query, Func<ManagementBaseObject, string?> format)
-    {
-        var values = new List<string>();
-        try
-        {
-            using var searcher = new ManagementObjectSearcher(query);
-            using var results = searcher.Get();
-            foreach (ManagementBaseObject item in results)
-            {
-                using (item)
-                    if (format(item)?.Trim() is { Length: > 0 } value)
-                        values.Add(value);
-            }
-        }
-        catch (Exception ex) when (IsSystemError(ex))
-        {
-            return null;
-        }
-
-        return values.Count == 0 ? null : string.Join(Environment.NewLine, values);
-    }
-
     private void OpenCleanClick(object sender, RoutedEventArgs e) => CleanNav.IsChecked = true;
     private void OpenProfileClick(object sender, RoutedEventArgs e) => ProfileNav.IsChecked = true;
-    private async void RefreshClick(object sender, RoutedEventArgs e) => await RefreshOverviewAsync();
+
+    private async void UpdateOverviewPolling()
+    {
+        if (!initialized || closing || !OverviewPage.IsVisible || WindowState == WindowState.Minimized)
+        {
+            overviewTimer.Stop();
+            return;
+        }
+
+        if (!overviewTimer.IsEnabled)
+        {
+            overviewTimer.Start();
+            await RefreshOverviewAsync();
+        }
+    }
 
     private async Task RefreshOverviewAsync()
     {
-        RefreshButton.IsEnabled = false;
-        SetStatus(RefreshStatus, "Получаем данные Windows…");
+        if (refreshingOverview || closing || !overviewTimer.IsEnabled)
+            return;
+
+        refreshingOverview = true;
         try
         {
             var overview = await RunInBackground(ReadOverview);
-            SetMemory(overview.Memory, overview.Commit);
-            SetPagefiles(overview.Pagefiles);
+            if (closing)
+                return;
+
+            if (lastOverview is not { } previous || previous.Memory != overview.Memory || previous.Commit != overview.Commit)
+                SetMemory(overview.Memory, overview.Commit);
+            if (lastOverview is null || !SamePagefiles(lastOverview.Pagefiles, overview.Pagefiles))
+                SetPagefiles(overview.Pagefiles);
             MemoryAdvice.Text = overview.Advice;
             SetStatus(RefreshStatus,
-                overview.HasErrors ? "Часть данных Windows недоступна" : $"Обновлено в {DateTime.Now:HH:mm:ss}",
+                overview.HasErrors ? "Часть данных Windows недоступна" : "Обновляется автоматически каждую секунду",
                 overview.HasErrors);
+            lastOverview = overview;
         }
         finally
         {
-            RefreshButton.IsEnabled = true;
+            refreshingOverview = false;
         }
     }
+
+    private static bool SamePagefiles(IReadOnlyList<PagefileUsage>? previous, IReadOnlyList<PagefileUsage>? current) =>
+        previous is null ? current is null : current is not null && previous.SequenceEqual(current);
 
     private static Overview ReadOverview()
     {
@@ -296,7 +274,7 @@ public partial class MainWindow : Window
         }
 
         var snapshot = Read(MemoryAndPagefileManager.ReadMemorySnapshot);
-        var pagefiles = Read(MemoryAndPagefileManager.ReadPagefiles);
+        var pagefiles = Read(MemoryAndPagefileManager.ReadLivePagefiles);
         var dump = Read(MemoryAndPagefileManager.ReadCrashDumpSettings);
         string advice = MemoryAndPagefileManager.ExplainManualSizing(snapshot?.Physical.TotalBytes, snapshot?.Commit, dump);
         return new Overview(snapshot?.Physical, snapshot?.Commit, pagefiles, advice, hasErrors);
@@ -551,15 +529,24 @@ public partial class MainWindow : Window
 
     private async Task RefreshTweaksAsync()
     {
+        if (loadingTweaks)
+            return;
+
         loadingTweaks = true;
         TweakItems.IsEnabled = false;
+        PrivacyItems.IsEnabled = false;
         try
         {
-            TweakItems.ItemsSource = await RunInBackground(() => TweaksEngine.Catalog.Select(ReadTweak).ToArray());
+            var (performance, privacy) = await RunInBackground(() => (
+                TweaksEngine.PerformanceCatalog.Select(ReadTweak).ToArray(),
+                TweaksEngine.PrivacyCatalog.Select(ReadTweak).ToArray()));
+            TweakItems.ItemsSource = performance;
+            PrivacyItems.ItemsSource = privacy;
         }
         finally
         {
             TweakItems.IsEnabled = true;
+            PrivacyItems.IsEnabled = true;
             loadingTweaks = false;
         }
     }
@@ -570,14 +557,15 @@ public partial class MainWindow : Window
         try
         {
             string? unsupported = TweaksEngine.SupportIssue(tweak);
-            string state = unsupported ?? TweaksEngine.DescribeState(tweak);
-            if (!canWrite)
+            var (value, hasBackup) = TweaksEngine.ReadSetting(tweak);
+            string state = unsupported ?? TweaksEngine.DescribeState(tweak, value);
+            if (unsupported is null && !canWrite)
                 state = $"{state.TrimEnd('.')}. Для изменения запустите CoreShift от имени администратора.";
-            return new TweakRow(tweak, state, canWrite && unsupported is null, canWrite);
+            return new TweakRow(tweak, state, canWrite && unsupported is null && value != tweak.AppliedValue, canWrite && hasBackup);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            return new TweakRow(tweak, $"Состояние недоступно: {ex.Message}", false, canWrite);
+            return new TweakRow(tweak, $"Состояние недоступно: {ex.Message}", false, false);
         }
     }
 
@@ -592,14 +580,16 @@ public partial class MainWindow : Window
         if (!restore && !Confirm(row.Name, $"{row.Description}\n\n{row.Risk}", "Применить"))
             return;
 
+        var status = PrivacyPage.IsVisible ? PrivacyStatus : TweaksStatus;
         loadingTweaks = true;
         TweakItems.IsEnabled = false;
-        TweaksStatus.Visibility = Visibility.Visible;
-        SetStatus(TweaksStatus, "Обновляем политику Windows…");
+        PrivacyItems.IsEnabled = false;
+        status.Visibility = Visibility.Visible;
+        SetStatus(status, "Обновляем политику Windows…");
         try
         {
             bool changed = await RunInBackground(() => TweaksEngine.Change(row.Tweak, restore));
-            SetStatus(TweaksStatus, (restore, changed) switch
+            SetStatus(status, (restore, changed) switch
             {
                 (true, true) => "Исходное значение политики восстановлено.",
                 (true, false) => "Сохранённое значение отсутствует.",
@@ -609,11 +599,14 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            SetStatus(TweaksStatus, ex.Message, error: true);
+            SetStatus(status, ex.Message, error: true);
         }
-
-        if (!closing)
-            await RefreshTweaksAsync();
+        finally
+        {
+            loadingTweaks = false;
+            if (!closing)
+                await RefreshTweaksAsync();
+        }
     }
 
     private async void RefreshProfileApplicationsClick(object sender, RoutedEventArgs e) =>
@@ -687,7 +680,7 @@ public partial class MainWindow : Window
         var priority = AbovePriority.IsChecked == true ? ProcessPriorityClass.AboveNormal
             : NormalPriority.IsChecked == true ? ProcessPriorityClass.Normal : ProcessPriorityClass.BelowNormal;
         string name = app.ProcessName;
-        var profile = new ContextProfileManager(name, priority);
+        var profile = new ContextProfileManager(name, priority, ProfileGamePower.IsChecked == true);
         using var stop = new CancellationTokenSource();
         profileStop = stop;
         UpdateProfileControls();
@@ -712,7 +705,7 @@ public partial class MainWindow : Window
                 });
             }, Report));
             bool restored = await profileTask;
-            SetStatus(ProfileStatus, restored ? "Профиль остановлен." : "Не удалось восстановить исходный приоритет.",
+            SetStatus(ProfileStatus, restored ? "Профиль остановлен." : "Не удалось полностью восстановить настройки профиля. См. журнал ниже.",
                 error: !restored);
         }
         catch (Exception ex) when (IsSystemError(ex))
@@ -730,7 +723,7 @@ public partial class MainWindow : Window
     private void StopProfileClick(object sender, RoutedEventArgs e)
     {
         StopProfileButton.IsEnabled = false;
-        SetStatus(ProfileStatus, "Останавливаем профиль и восстанавливаем приоритет…");
+        SetStatus(ProfileStatus, "Останавливаем профиль и восстанавливаем настройки…");
         profileStop?.Cancel();
     }
 
@@ -742,6 +735,7 @@ public partial class MainWindow : Window
         ProfileApplication.IsEnabled = canChoose && ProfileApplication.HasItems;
         RefreshProfileApplicationsButton.IsEnabled = canChoose;
         PriorityChoices.IsEnabled = !running;
+        ProfileGamePower.IsEnabled = !running && gamePowerPlanAvailable;
         StopProfileButton.IsEnabled = profileStop is { IsCancellationRequested: false };
     }
 
@@ -787,6 +781,7 @@ public partial class MainWindow : Window
     private async Task<bool> PrepareToExitAsync()
     {
         closing = true;
+        overviewTimer.Stop();
         WindowSurface.IsEnabled = false;
         profileStop?.Cancel();
         var activeProfile = profileTask;
@@ -819,6 +814,7 @@ public partial class MainWindow : Window
         WindowSurface.IsEnabled = true;
         closing = false;
         ShowFromTray();
+        UpdateOverviewPolling();
     }
 
     private void CloseForExit()
@@ -837,6 +833,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        overviewTimer.Stop();
         updateTimer.Stop();
         updateLifetime.Cancel();
         updateLifetime.Dispose();
@@ -859,6 +856,7 @@ public partial class MainWindow : Window
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
     {
+        UpdateOverviewPolling();
         bool maximized = WindowState == WindowState.Maximized;
         MaximizeGlyph.Data = Geometry.Parse(maximized ? "M 0,3 H 7 V 10 H 0 Z M 3,3 V 0 H 10 V 7 H 7" : "M 0,0 H 9 V 9 H 0 Z");
         string action = maximized ? "Восстановить размер" : "Развернуть";

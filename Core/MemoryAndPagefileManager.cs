@@ -48,6 +48,24 @@ internal static class MemoryAndPagefileManager
         return files;
     }
 
+    internal static IReadOnlyList<PagefileUsage> ReadLivePagefiles()
+    {
+        var files = new List<PagefileUsage>();
+        int pageSize = Environment.SystemPageSize;
+        uint ToMiB(nuint pages) => (uint)((ulong)pages * (uint)pageSize / (1024 * 1024));
+
+        bool success = EnumPageFilesW((IntPtr _, in PagefileInformation info, string name) =>
+        {
+            string path = name.StartsWith(@"\??\", StringComparison.Ordinal) ? name[4..] : name;
+            files.Add(new PagefileUsage(path, ToMiB(info.TotalSize), ToMiB(info.TotalInUse), ToMiB(info.PeakUsage)));
+            return true;
+        }, IntPtr.Zero);
+        if (!success)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        return files;
+    }
+
     internal static MemoryCommit ReadCommit()
     {
         var info = ReadPerformanceInformation();
@@ -119,6 +137,21 @@ internal static class MemoryAndPagefileManager
         public nuint SystemCache, KernelTotal, KernelPaged, KernelNonpaged, PageSize;
         public uint HandleCount, ProcessCount, ThreadCount;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PagefileInformation
+    {
+        public uint Size, Reserved;
+        public nuint TotalSize, TotalInUse, PeakUsage;
+    }
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private delegate bool PagefileCallback(IntPtr context, in PagefileInformation info, string name);
+
+    [DllImport("psapi.dll", ExactSpelling = true, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumPageFilesW(PagefileCallback callback, IntPtr context);
 
     [DllImport("psapi.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -10,6 +10,34 @@
         <shell:WindowChrome CaptionHeight="48" ResizeBorderThickness="6" GlassFrameThickness="0"
                             CornerRadius="0" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <DataTemplate x:Key="WindowsTweakCard">
+            <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                <StackPanel>
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding State}" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding Description}" Style="{StaticResource SecondaryText}" Margin="0,5,0,0" />
+                    <TextBlock Text="{Binding Risk}" Style="{StaticResource SecondaryText}" Margin="0,4,0,0" />
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button Content="Применить" Tag="{Binding}" IsEnabled="{Binding CanApply}"
+                                Style="{StaticResource PrimaryButton}" Click="ApplyTweakClick" Margin="0,0,8,0" />
+                        <Button Content="Восстановить" Tag="{Binding}" IsEnabled="{Binding CanRestore}" Click="RestoreTweakClick" />
+                        <Button Content="Параметры пользователя" Tag="{Binding SettingsUri}" Click="OpenTweakSettingsClick" Margin="8,0,0,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SettingsUri}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
     <Grid x:Name="WindowSurface" Background="{StaticResource Canvas}">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
@@ -83,7 +111,9 @@
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
                         <RadioButton x:Name="CleanNav" Content="Очистка" Tag="{StaticResource CleanIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="TweaksNav" Content="Твики Windows" Tag="{StaticResource TweaksIcon}"
+                        <RadioButton x:Name="TweaksNav" Content="Оптимизация" Tag="{StaticResource TweaksIcon}"
+                                     GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <RadioButton x:Name="PrivacyNav" Content="Персонализация" Tag="{StaticResource PrivacyIcon}" ToolTip="Персонализация и приватность"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
                         <RadioButton x:Name="ProfileNav" Content="Профиль фокуса" Tag="{StaticResource FocusIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
@@ -94,21 +124,9 @@
             <ScrollViewer x:Name="PageScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Grid Margin="30,23,30,26">
                     <StackPanel x:Name="OverviewPage">
-                        <DockPanel LastChildFill="True" Margin="0,0,0,17">
-                            <Button x:Name="RefreshButton" DockPanel.Dock="Right" VerticalAlignment="Center"
-                                    Margin="12,0,0,0" Click="RefreshClick" AutomationProperties.Name="Обновить диагностику">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource RefreshIcon}" Stroke="{StaticResource Accent}" StrokeThickness="1.5"
-                                          Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
-                                    <TextBlock Text="Обновить" />
-                                </StackPanel>
-                            </Button>
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource PageTitle}" Text="Обзор системы" />
-                                <TextBlock x:Name="RefreshStatus" Style="{StaticResource SecondaryText}" Margin="0,4,0,0"
-                                           Text="Получаем данные Windows…" AutomationProperties.LiveSetting="Polite" />
-                            </StackPanel>
-                        </DockPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Обзор системы" />
+                        <TextBlock x:Name="RefreshStatus" Style="{StaticResource SecondaryText}" Margin="0,4,0,17"
+                                   Text="Получаем данные Windows…" />
 
                         <Border Style="{StaticResource Card}" Padding="0" MinHeight="219">
                             <Border.Background>
@@ -239,26 +257,33 @@
                     <StackPanel x:Name="PcInfoPage" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource PageTitle}" Text="О компьютере" />
                         <TextBlock Style="{StaticResource SecondaryText}" Text="Сведения о Windows и оборудовании." Margin="0,4,0,17" />
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}"
-                                           Text="Получаем сведения о компьютере…" AutomationProperties.LiveSetting="Polite" />
-                                <ItemsControl x:Name="PcInfoItems">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="160" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Style="{StaticResource SecondaryText}" Text="{Binding Label}" Margin="0,0,14,0" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
+                        <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}"
+                                   Text="Получаем сведения о компьютере…" AutomationProperties.LiveSetting="Polite" />
+                        <ItemsControl x:Name="PcInfoItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource SectionTitle}" Text="{Binding Title}" Margin="0,0,0,8" />
+                                            <ItemsControl ItemsSource="{Binding Rows}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,5">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="180" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Style="{StaticResource SecondaryText}" Text="{Binding Label}" Margin="0,0,14,0" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
 
                     <StackPanel x:Name="MemoryPage" Visibility="Collapsed">
@@ -361,34 +386,89 @@
                     </StackPanel>
 
                     <StackPanel x:Name="TweaksPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Твики Windows" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Настройка системных политик с восстановлением исходных значений." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Производительность" Margin="0,0,0,17" />
+                        <TextBlock x:Name="PerformanceSettingsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                   Margin="0,0,0,10" AutomationProperties.LiveSetting="Polite" />
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Лимит фоновой загрузки обновлений" />
+                                <TextBlock x:Name="DownloadLimitState" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="Освобождает часть интернет-канала для игр и звонков. Обновления могут скачиваться дольше. Лимит действует на загрузки через оптимизацию доставки, кроме загрузок от устройств в локальной сети." />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Label Content="Лимит, % (1–100)" Target="{Binding ElementName=DownloadLimitValue}"
+                                           Foreground="{StaticResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBox x:Name="DownloadLimitValue" Text="20" Width="62" MaxLength="3" IsEnabled="False"
+                                             VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                                    <Button x:Name="ApplyDownloadLimitButton" Content="Применить" Style="{StaticResource PrimaryButton}"
+                                            IsEnabled="False" Click="ApplyDownloadLimitClick" Margin="0,0,8,0" />
+                                    <Button x:Name="RestoreDownloadLimitButton" Content="Восстановить" IsEnabled="False" Click="RestoreDownloadLimitClick" />
+                                    <Button Content="Параметры Windows" Tag="ms-settings:delivery-optimization-advanced"
+                                            Click="OpenPerformanceSettingsClick" Margin="8,0,0,0" />
+                                </WrapPanel>
+                                <TextBlock x:Name="DownloadLimitStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                           Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Приложения в автозагрузке" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="В разделе «Автозагрузка приложений» Диспетчера задач видна оценка влияния на запуск. Там же можно отключить автозапуск выбранного приложения и позже включить его снова." />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="Открыть автозагрузку Windows" Click="OpenPerformanceSettingsClick" Tag="ms-settings:startupapps" Margin="0,0,8,0" />
+                                    <Button Content="Диспетчер задач" Click="OpenStartupImpactClick" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Оптимизация оконных игр" />
+                                <TextBlock x:Name="WindowedGamesHelp" Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="Снижает задержку вывода кадра в совместимых играх DirectX 10 и 11 в оконном режиме и в окне без рамки. Включите оптимизацию в настройках графики и перезапустите игру." />
+                                <Button x:Name="WindowedGamesButton" Content="Открыть настройки графики Windows"
+                                        Tag="ms-settings:display-advancedgraphics" Click="OpenPerformanceSettingsClick" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Исключения из индексации" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="Исключите папки с часто меняющимися файлами, например кэшем или результатами сборки. Поиск по этим папкам может стать медленнее. Уже настроенные правила для вложенных папок сохраняются." />
+                                <ListBox x:Name="IndexExclusionsList" MaxHeight="140" Margin="0,10,0,0" Visibility="Collapsed"
+                                         SelectionChanged="IndexExclusionSelectionChanged" AutomationProperties.Name="Исключения из индексации, добавленные CoreShift" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="AddIndexExclusionButton" Content="Исключить папку…" Click="AddIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
+                                    <Button x:Name="RestoreIndexExclusionButton" Content="Восстановить индексацию" Click="RestoreIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
+                                    <Button Content="Открыть параметры поиска" Click="OpenPerformanceSettingsClick" Tag="ms-settings:search" />
+                                </WrapPanel>
+                                <TextBlock x:Name="IndexExclusionStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
+                                           AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Временный план питания для игры" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="Профиль фокуса может переключить Windows на план «Высокая производительность» после первого перехода в игру. Исходный план возвращается после закрытия игры, отключения питания от сети или остановки профиля." />
+                                <Button Content="Открыть профиль фокуса" Click="OpenProfileClick" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
                         <TextBlock x:Name="TweaksStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"
                                    Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
-                        <ItemsControl x:Name="TweakItems">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding State}" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
-                                            <TextBlock Text="{Binding Description}" Style="{StaticResource SecondaryText}" Margin="0,5,0,0" />
-                                            <TextBlock Text="{Binding Risk}" Style="{StaticResource SecondaryText}" Margin="0,4,0,0" />
-                                            <WrapPanel Margin="0,10,0,0">
-                                                <Button Content="Применить" Tag="{Binding}" IsEnabled="{Binding CanApply}"
-                                                        Style="{StaticResource PrimaryButton}" Click="ApplyTweakClick" Margin="0,0,8,0" />
-                                                <Button Content="Восстановить" Tag="{Binding}" IsEnabled="{Binding CanRestore}" Click="RestoreTweakClick" />
-                                            </WrapPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <ItemsControl x:Name="TweakItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="PrivacyPage" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Персонализация и приватность" Margin="0,0,0,17" />
+                        <TextBlock x:Name="PrivacyStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"
+                                   Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+                        <ItemsControl x:Name="PrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
                     </StackPanel>
 
                     <StackPanel x:Name="ProfilePage" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource PageTitle}" Text="Профиль фокуса" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Временный приоритет выбранного приложения, пока его окно в фокусе." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="Временный приоритет приложения в фокусе и план питания на время игры." Margin="0,4,0,17" />
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Приложение и приоритет" />
@@ -419,6 +499,10 @@
                                     <RadioButton x:Name="NormalPriority" Content="Обычный" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
                                     <RadioButton Content="Ниже обычного" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
                                 </WrapPanel>
+                                <CheckBox x:Name="ProfileGamePower" Style="{StaticResource CleanupOption}" Margin="0,5,0,6"
+                                          Content="Включать план «Высокая производительность» для выбранного приложения" />
+                                <TextBlock x:Name="ProfilePowerStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
+                                           Text="Только при питании от сети. Может увеличить энергопотребление и нагрев." />
                                 <WrapPanel>
                                     <Button x:Name="StartProfileButton" Content="Запустить профиль" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="StartProfileClick" Margin="0,0,8,0" />
                                     <Button x:Name="StopProfileButton" Content="Остановить" IsEnabled="False" Click="StopProfileClick" />

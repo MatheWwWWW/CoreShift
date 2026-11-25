@@ -12,7 +12,10 @@
   <ItemGroup>
     <Using Remove="System.Drawing" />
     <Using Remove="System.Windows.Forms" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <ProjectReference Include="../SmartResourceDispatcher.csproj" />
+    <None Update="ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
   </ItemGroup>
   <Target Name="ConfigureDesktopBundle" BeforeTargets="_ComputeFilesToBundle">
     <ItemGroup>
@@ -26,6 +29,8 @@
                   or '%(ResolvedFileToPublish.RelativePath)' == 'System.Printing.dll'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'ijwhost.dll'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'vcruntime140_cor3.dll'" />
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" ExcludeFromSingleFile="true"
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'LibreHardwareMonitorLib.dll'" />
     </ItemGroup>
   </Target>
 </Project>

@@ -21,6 +21,13 @@ if (args is ["--cache-preview"])
     return;
 }
 
+if (args is ["--performance"])
+{
+    CheckTweakRestore();
+    CheckContextProfile();
+    return;
+}
+
 CheckTempCleanup();
 CheckTempDeleteAccess();
 CheckExplorerCache();
@@ -366,6 +373,20 @@ static void CheckTweakRestore()
         policy.SetValue(tweak.ValueName, 0);
         Require(TweaksEngine.Change(testHive, tweak, "Backups", restore: true) && policy.GetValue(tweak.ValueName) is 3,
             "Restore should recreate the exact original DWORD.");
+
+        var limit = tweak with { Id = "limit", AppliedValue = 20, Configurable = true };
+        Require(TweaksEngine.Change(testHive, limit, "Backups", restore: false) && policy.GetValue(limit.ValueName) is 20,
+            "The configurable policy should apply the requested limit.");
+        Require(TweaksEngine.Change(testHive, limit with { AppliedValue = 55 }, "Backups", restore: false) &&
+            policy.GetValue(limit.ValueName) is 55, "The applied limit should be editable.");
+        Require(TweaksEngine.Change(testHive, limit, "Backups", restore: true) && policy.GetValue(limit.ValueName) is 3,
+            "Restore should use the saved applied limit and retain the original value across edits.");
+
+        using (var backups = testHive.OpenSubKey("Backups", writable: true)!)
+            backups.SetValue(limit.Id, "3|55|20");
+        policy.SetValue(limit.ValueName, 20);
+        Require(TweaksEngine.Change(testHive, limit, "Backups", restore: true) && policy.GetValue(limit.ValueName) is 3,
+            "Restore should recover when a limit change was interrupted before writing the new value.");
         Require(TweaksEngine.SupportIssue("telemetry", "Professional", new Version(10, 0, 22631)) is not null,
             "Telemetry level 0 should be restricted by edition.");
         Require(TweaksEngine.SupportIssue("game-dvr", "Professional", new Version(10, 0, 22631)) is not null,
@@ -373,6 +394,12 @@ static void CheckTweakRestore()
         Require(TweaksEngine.SupportIssue("notification-center", "Professional", new Version(10, 0, 19043, 1201)) is not null &&
             TweaksEngine.SupportIssue("notification-center", "Professional", new Version(10, 0, 19043, 1202)) is null,
             "The older Windows 10 builds require the taskbar policy update.");
+        Require(TweaksEngine.SupportIssue("background-download-limit", "Professional", new Version(10, 0, 17134)) is null &&
+            TweaksEngine.SupportIssue("background-download-limit", "Core", new Version(10, 0, 26100)) is not null,
+            "The download limit policy should respect the documented build and edition.");
+        Require(TweaksEngine.SupportIssue("search-highlights", "Professional", new Version(10, 0, 22000, 1760)) is not null &&
+            TweaksEngine.SupportIssue("search-highlights", "Professional", new Version(10, 0, 22000, 1761)) is null,
+            "The original Windows 11 release needs the Search Highlights update.");
         Console.WriteLine("PASS registry apply, conflicts and restore");
     }
     finally
