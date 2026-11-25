@@ -99,10 +99,10 @@ static void CheckTempDeleteAccess()
 
         using var identity = WindowsIdentity.GetCurrent();
         var user = identity.User!;
-        var originalFolderAcl = folder.GetAccessControl(AccessControlSections.Access);
-        var originalFileAcl = protectedFile.GetAccessControl(AccessControlSections.Access);
         var folderAcl = folder.GetAccessControl(AccessControlSections.Access);
         var fileAcl = protectedFile.GetAccessControl(AccessControlSections.Access);
+        byte[] originalFolderAcl = folderAcl.GetSecurityDescriptorBinaryForm();
+        byte[] originalFileAcl = fileAcl.GetSecurityDescriptorBinaryForm();
         folderAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.DeleteSubdirectoriesAndFiles, AccessControlType.Deny));
         fileAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.Delete, AccessControlType.Deny));
         try
@@ -119,19 +119,30 @@ static void CheckTempDeleteAccess()
             Require(result.DeletedFiles == 1 && result.DeniedFiles == 1 &&
                 File.Exists(protectedFile.FullName) && !File.Exists(removable),
                 $"Cleanup must report access revoked after preview and still remove the other file: {result}.");
-            Console.WriteLine("PASS Windows delete access in Temp preview and cleanup");
         }
         finally
         {
-            folder.SetAccessControl(originalFolderAcl);
-            if (File.Exists(protectedFile.FullName))
-                protectedFile.SetAccessControl(originalFileAcl);
+            // Reloading each snapshot marks its access rules as modified for SetAccessControl.
+            try
+            {
+                folderAcl.SetSecurityDescriptorBinaryForm(originalFolderAcl, AccessControlSections.Access);
+                folder.SetAccessControl(folderAcl);
+            }
+            finally
+            {
+                if (File.Exists(protectedFile.FullName))
+                {
+                    fileAcl.SetSecurityDescriptorBinaryForm(originalFileAcl, AccessControlSections.Access);
+                    protectedFile.SetAccessControl(fileAcl);
+                }
+            }
         }
     }
     finally
     {
         scratch.Delete(recursive: true);
     }
+    Console.WriteLine("PASS Windows delete access in Temp preview and cleanup");
 }
 
 static void CheckExplorerCache()
