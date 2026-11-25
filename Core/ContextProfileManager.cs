@@ -4,8 +4,12 @@ using System.Runtime.InteropServices;
 
 namespace SmartResourceDispatcher.Core;
 
-internal sealed class ContextProfileManager(string processName, ProcessPriorityClass priority, bool useGamePowerPlan = false)
+internal sealed class ContextProfileManager(string processName, ProcessPriorityClass priority, bool useGamePowerPlan = false,
+    ContextProfileManager.SelectedProcess? selected = null)
 {
+    internal readonly record struct SelectedProcess(int Id, DateTime StartedUtc);
+    internal readonly record struct WatchResult(bool Restored, bool ProcessExited);
+
     private sealed record ActiveProcess(Process Process, ProcessPriorityClass OriginalPriority);
 
     private ActiveProcess? active;
@@ -23,9 +27,20 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
         return name;
     }
 
-    internal bool Watch(CancellationToken stop, Action started, Action<string> report)
+    internal WatchResult Watch(CancellationToken stop, Action started, Action<string> report,
+        Action<int, DateTime>? processFocused = null)
     {
         using var mutex = new Mutex(false, @"Local\SmartResourceDispatcher.ContextProfile");
+        return Watch(mutex, stop, started, report, processFocused);
+    }
+
+    internal WatchResult Watch(Mutex mutex, CancellationToken stop, Action started, Action<string> report,
+        Action<int, DateTime>? processFocused = null)
+    {
+        using var watchedProcess = OpenSelectedProcess();
+        if (selected.HasValue && watchedProcess is null)
+            return new WatchResult(Restored: true, ProcessExited: true);
+
         using var powerMutex = useGamePowerPlan ? new Mutex(false, @"Global\SmartResourceDispatcher.GamePowerPlan") : null;
         try
         {
@@ -38,6 +53,7 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
         }
 
         bool restored = false;
+        bool processExited = false;
         bool ownsPowerMutex = false;
         try
         {
@@ -55,7 +71,13 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
             started();
             while (!stop.IsCancellationRequested)
             {
-                Observe(ReadForegroundProcessId(), report);
+                if (watchedProcess?.HasExited == true)
+                {
+                    processExited = true;
+                    break;
+                }
+
+                Observe(ReadForegroundProcessId(), report, processFocused);
                 powerProfile?.Update(report);
                 stop.WaitHandle.WaitOne(250);
             }
@@ -77,10 +99,41 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
             }
         }
 
-        return restored;
+        return new WatchResult(restored, processExited);
     }
 
-    internal void Observe(int? foregroundPid, Action<string> report)
+    private Process? OpenSelectedProcess()
+    {
+        if (selected is not { } expected)
+            return null;
+
+        Process? process = null;
+        try
+        {
+            process = Process.GetProcessById(expected.Id);
+            // Retain the handle across focus changes so the watcher follows the same process.
+            _ = process.SafeHandle;
+            if (process.HasExited || !MatchesSelectedProcess(process))
+                return null;
+
+            var watchedProcess = process;
+            process = null;
+            return watchedProcess;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception { NativeErrorCode: 87 })
+        {
+            return null;
+        }
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
+    private bool MatchesSelectedProcess(Process process) =>
+        selected is not { } target || (process.Id == target.Id && process.StartTime.ToUniversalTime() == target.StartedUtc);
+
+    internal void Observe(int? foregroundPid, Action<string> report, Action<int, DateTime>? processFocused = null)
     {
         if (foregroundPid == observedPid && (active is null || !active.Process.HasExited))
             return;
@@ -90,6 +143,8 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
 
         observedPid = foregroundPid;
         if (foregroundPid is not > 4 || foregroundPid.Value == Environment.ProcessId)
+            return;
+        if (selected is { } target && foregroundPid.Value != target.Id)
             return;
 
         Process? process = null;
@@ -101,6 +156,16 @@ internal sealed class ContextProfileManager(string processName, ProcessPriorityC
 
             // Keep the handle to the same process instance until the priority is restored.
             _ = process.SafeHandle;
+            if (!MatchesSelectedProcess(process))
+                return;
+            if (processFocused is not null)
+            {
+                try { processFocused(process.Id, process.StartTime.ToUniversalTime()); }
+                catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+                {
+                    Debug.WriteLine(ex);
+                }
+            }
             powerProfile?.Track(process);
             ProcessPriorityClass original = process.PriorityClass;
             if (original == priority)

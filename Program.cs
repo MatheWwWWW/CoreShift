@@ -168,10 +168,10 @@ static int WatchProfile(string processName, string priorityName)
     Console.CancelKeyPress += Cancel;
     try
     {
-        bool restored = profile.Watch(stop.Token,
+        var result = profile.Watch(stop.Token,
             () => Console.WriteLine($"Профиль для {processName}, приоритет {priority}. Для выхода нажмите Ctrl+C."),
             Console.WriteLine);
-        return restored ? 0 : 1;
+        return result.Restored ? 0 : 1;
     }
     finally
     {

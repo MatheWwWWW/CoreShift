@@ -255,58 +255,296 @@
                     </StackPanel>
 
                     <StackPanel x:Name="PcInfoPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="О компьютере" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Сведения о Windows и оборудовании." Margin="0,4,0,17" />
-                        <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}"
+                        <DockPanel Margin="0,0,0,17">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                <Button x:Name="PcInfoRefreshButton" Content="Обновить" Click="RefreshPcInfoClick" Margin="0,0,8,0" />
+                                <Button x:Name="PcInfoCopyButton" Content="Скопировать отчёт" Click="CopyPcInfoClick" IsEnabled="False" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource PageTitle}" Text="О компьютере" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}" FontSize="14" Margin="0,0,0,12" Visibility="Collapsed"
                                    Text="Получаем сведения о компьютере…" AutomationProperties.LiveSetting="Polite" />
+                        <ItemsControl x:Name="PcInfoSummary" Margin="0,0,-12,4">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}" Margin="0,0,12,12" Padding="16,14">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Label}" Style="{StaticResource SecondaryText}" FontSize="14" />
+                                            <TextBlock Text="{Binding Value}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                            <TextBlock Text="{Binding Detail}" Margin="0,4,0,0" FontSize="14">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <ItemsControl x:Name="PcInfoItems">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
-                                        <StackPanel>
-                                            <TextBlock Style="{StaticResource SectionTitle}" Text="{Binding Title}" Margin="0,0,0,8" />
+                                    <Expander Style="{StaticResource DetailsExpander}" IsExpanded="{Binding Expanded, Mode=TwoWay}" Margin="0,0,0,10">
+                                        <Expander.Header>
+                                            <TextBlock Style="{StaticResource SectionTitle}" Text="{Binding Title}" FontSize="18" TextWrapping="Wrap" />
+                                        </Expander.Header>
+                                        <Border Style="{StaticResource Card}" Padding="16,6">
                                             <ItemsControl ItemsSource="{Binding Rows}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="0,5">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="180" />
-                                                                <ColumnDefinition Width="*" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Style="{StaticResource SecondaryText}" Text="{Binding Label}" Margin="0,0,14,0" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                                                        </Grid>
+                                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,7">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="205" />
+                                                                    <ColumnDefinition />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="{Binding Label}" FontSize="14" LineHeight="23" Margin="0,0,18,0">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsGroup}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="16" FontWeight="Medium"
+                                                                           LineHeight="23" TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                        </StackPanel>
-                                    </Border>
+                                        </Border>
+                                    </Expander>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
 
                     <StackPanel x:Name="MemoryPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Память" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Диагностика файла подкачки и рабочий набор процессов." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Память" Margin="0,0,0,17" />
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Настройка файла подкачки" />
-                                <TextBlock Text="Рекомендация: оставьте управление размером файла подкачки Windows." TextWrapping="Wrap" Margin="0,10,0,0" />
-                                <TextBlock x:Name="MemoryAdvice" Style="{StaticResource SecondaryText}" Margin="0,9,0,0" />
+                                <UniformGrid Columns="3">
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Доступно ОЗУ" />
+                                        <TextBlock x:Name="DiagnosticRam" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Выделено Windows" />
+                                        <TextBlock x:Name="DiagnosticCommit" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Запас до лимита" />
+                                        <TextBlock x:Name="DiagnosticHeadroom" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="История за 15 минут" Margin="0,18,0,8" />
+                                <WrapPanel Margin="0,0,0,8">
+                                    <TextBlock Text="●  Занято ОЗУ" Foreground="{StaticResource Accent}" Margin="0,0,16,0" />
+                                    <TextBlock Text="●  Выделено от текущего лимита" Foreground="{StaticResource Violet}" />
+                                </WrapPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="106" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="100%" VerticalAlignment="Top" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="50%" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="0%" VerticalAlignment="Bottom" />
+                                    </Grid>
+                                    <Grid Grid.Column="1" Background="{StaticResource Canvas}" AutomationProperties.Name="История загрузки памяти">
+                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1" />
+                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" VerticalAlignment="Center" />
+                                        <Canvas x:Name="MemoryHistoryPlot" ClipToBounds="True" SizeChanged="MemoryHistorySizeChanged">
+                                            <Path x:Name="RamHistoryLine" Stroke="{StaticResource Accent}" StrokeThickness="2" />
+                                            <Path x:Name="CommitHistoryLine" Stroke="{StaticResource Violet}" StrokeThickness="2" StrokeDashArray="3,2" />
+                                        </Canvas>
+                                        <TextBlock x:Name="MemoryHistoryStatus" Style="{StaticResource SecondaryText}"
+                                                   Text="Собираем первые замеры…" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" />
+                                    </Grid>
+                                    <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,5,0,0">
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Сейчас" DockPanel.Dock="Right" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="15 минут назад" />
+                                    </DockPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource Card}">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Сбросить рабочий набор процесса" />
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,8,0,15"
-                                           Text="Укажите PID из Диспетчера задач. Процесс сможет снова загрузить страницы памяти по мере необходимости." />
-                                <Label Content="PID процесса" Target="{Binding ElementName=TrimPid}" Foreground="{StaticResource Text}" Padding="0,0,0,5" />
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBox x:Name="TrimPid" Width="140" MaxLength="10" Margin="0,0,8,0" />
-                                    <Button x:Name="TrimButton" Content="Сбросить" Style="{StaticResource PrimaryButton}" Click="TrimClick" />
-                                </StackPanel>
-                                <TextBlock x:Name="TrimStatus" Style="{StaticResource SecondaryText}" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Приложения и процессы" />
+                                <Grid Margin="0,12,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition />
+                                        <ColumnDefinition Width="224" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <Label Content="Имя процесса или PID" Target="{Binding ElementName=MemoryProcessSearch}"
+                                               Foreground="{StaticResource Muted}" Padding="0,0,0,5" />
+                                        <TextBox x:Name="MemoryProcessSearch" TextChanged="MemoryProcessSearchChanged" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <Label Content="Сортировка" Target="{Binding ElementName=MemoryProcessSort}"
+                                               Foreground="{StaticResource Muted}" Padding="0,0,0,5" />
+                                        <ComboBox x:Name="MemoryProcessSort" Style="{StaticResource DarkComboBox}"
+                                                  SelectedIndex="0" SelectionChanged="MemoryProcessSortChanged">
+                                            <ComboBoxItem Content="По объёму ОЗУ" />
+                                            <ComboBoxItem Content="По приросту в ОЗУ" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                                <Border BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Background="{StaticResource Canvas}">
+                                    <StackPanel Grid.IsSharedSizeScope="True">
+                                        <Border Background="{StaticResource Raised}" BorderBrush="{StaticResource Line}"
+                                                BorderThickness="0,0,0,1" CornerRadius="7,7,0,0" Padding="12,8,25,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition />
+                                                    <ColumnDefinition Width="62" SharedSizeGroup="ProcessIdColumn" />
+                                                    <ColumnDefinition Width="98" SharedSizeGroup="WorkingSetColumn" />
+                                                    <ColumnDefinition Width="118" SharedSizeGroup="GrowthColumn" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Style="{StaticResource SecondaryText}" Text="Процесс" />
+                                                <TextBlock Grid.Column="1" Style="{StaticResource SecondaryText}" Text="PID" TextAlignment="Right" />
+                                                <TextBlock Grid.Column="2" Style="{StaticResource SecondaryText}" Text="В ОЗУ" TextAlignment="Right" />
+                                                <TextBlock Grid.Column="3" Style="{StaticResource SecondaryText}" Text="Изм. за 2 мин" TextAlignment="Right" />
+                                            </Grid>
+                                        </Border>
+                                        <Grid>
+                                            <ListBox x:Name="MemoryProcesses" MaxHeight="234" MinHeight="44" Background="Transparent"
+                                                     BorderThickness="0" Padding="0" Foreground="{StaticResource Text}"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                                     AutomationProperties.Name="Процессы и использование ОЗУ" SelectionChanged="MemoryProcessSelectionChanged">
+                                                <ListBox.ItemContainerStyle>
+                                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                                        <Setter Property="Padding" Value="12,7" />
+                                                    </Style>
+                                                </ListBox.ItemContainerStyle>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition />
+                                                                <ColumnDefinition SharedSizeGroup="ProcessIdColumn" />
+                                                                <ColumnDefinition SharedSizeGroup="WorkingSetColumn" />
+                                                                <ColumnDefinition SharedSizeGroup="GrowthColumn" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" Margin="0,0,8,0" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Pid}" Foreground="{StaticResource Muted}" TextAlignment="Right" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding WorkingSet}" FontFamily="Cascadia Mono, Consolas" TextAlignment="Right" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding Growth}" FontFamily="Cascadia Mono, Consolas" TextAlignment="Right" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <TextBlock x:Name="MemoryProcessNoMatches" Text="Процессы не найдены" Visibility="Collapsed"
+                                                       Style="{StaticResource SecondaryText}" Margin="12,8"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                                                       AutomationProperties.LiveSetting="Polite" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock x:Name="MemoryProcessStatus" Style="{StaticResource SecondaryText}" Text="Получаем список процессов…" Margin="0,8,0,0" />
+                                <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button x:Name="TrimButton" Content="Сбросить рабочий набор" IsEnabled="False" Click="TrimClick"
+                                                    DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock x:Name="MemoryProcessSelection" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                           Text="Выберите процесс в таблице" />
+                                                <TextBlock x:Name="MemoryProcessActionHint" Style="{StaticResource SecondaryText}"
+                                                           Margin="0,3,0,0" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock x:Name="TrimStatus" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Файл подкачки" />
+                                <TextBlock x:Name="PagefileMode" Style="{StaticResource SecondaryText}" Text="Читаем настройки Windows…" Margin="0,6,0,0" />
+                                <TextBlock x:Name="DiagnosticPagefileStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0" Visibility="Collapsed" />
+                                <ItemsControl x:Name="DiagnosticPagefiles">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
+                                                    BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,10,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <UniformGrid Columns="3" Margin="0,9,0,0">
+                                                        <StackPanel Margin="0,0,10,0">
+                                                            <TextBlock Text="Занято / выделено" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{Binding Allocation}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                        </StackPanel>
+                                                        <StackPanel Margin="0,0,10,0">
+                                                            <TextBlock Text="Пик использования" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{Binding Peak}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                        </StackPanel>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Свободно на диске" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{Binding FreeSpace}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                        </StackPanel>
+                                                    </UniformGrid>
+                                                    <ProgressBar Value="{Binding UsagePercent, Mode=OneWay}" Maximum="100" Margin="0,10,0,0"
+                                                                 AutomationProperties.Name="Использование выделенного файла подкачки">
+                                                        <ProgressBar.Style>
+                                                            <Style TargetType="ProgressBar" BasedOn="{StaticResource MemoryUsageMeter}">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasUsage}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ProgressBar.Style>
+                                                    </ProgressBar>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="MemoryPressureStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,8,0,0" />
+                                <Expander Header="Оценка размера и системные дампы" Style="{StaticResource DetailsExpander}" Margin="0,12,0,0">
+                                    <TextBlock x:Name="MemoryAdvice" Style="{StaticResource SecondaryText}" />
+                                </Expander>
+                                <DockPanel Margin="0,12,0,0">
+                                    <Button Content="Открыть параметры системы" Click="OpenPagefileSettingsClick" Margin="0,0,12,0" />
+                                    <TextBlock Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
+                                               Text="Быстродействие → Параметры → Дополнительно → Виртуальная память" />
+                                </DockPanel>
+                                <TextBlock x:Name="PagefileSettingsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,6,0,0" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -468,7 +706,7 @@
 
                     <StackPanel x:Name="ProfilePage" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource PageTitle}" Text="Профиль фокуса" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Временный приоритет приложения в фокусе и план питания на время игры." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="Временный приоритет приложения и план питания на время игры. Профиль останавливается при выходе из выбранного приложения." Margin="0,4,0,17" />
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Приложение и приоритет" />
@@ -479,7 +717,7 @@
                                         <ColumnDefinition Width="350" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ProfileApplication" Style="{StaticResource ProfileApplicationPicker}"
+                                    <ComboBox x:Name="ProfileApplication" Style="{StaticResource DarkComboBox}" Tag="Выберите приложение"
                                               IsEnabled="False" SelectionChanged="ProfileApplicationChanged" TextSearch.TextPath="Label">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
@@ -514,7 +752,22 @@
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Состояние профиля" />
                                 <TextBlock x:Name="ProfileStatus" Style="{StaticResource SecondaryText}" Text="Профиль остановлен."
                                            Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
-                                <ItemsControl x:Name="ProfileEvents" Margin="0,6,0,0">
+                                <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Память за сеанс" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="MemorySessionStatus" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
+                                        <TextBlock x:Name="MemorySessionPeak" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
+                                        <ItemsControl x:Name="MemorySessionProcesses">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                                <ItemsControl x:Name="ProfileEvents" Margin="0,8,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding}" Style="{StaticResource SecondaryText}" Margin="0,5,0,0" />

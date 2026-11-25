@@ -284,7 +284,7 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="ProfileApplicationPicker" TargetType="ComboBox">
+    <Style x:Key="DarkComboBox" TargetType="ComboBox">
         <Setter Property="Foreground" Value="{StaticResource Text}" />
         <Setter Property="Background" Value="{StaticResource Canvas}" />
         <Setter Property="BorderBrush" Value="{StaticResource Line}" />
@@ -342,8 +342,8 @@
                         </ToggleButton>
                         <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                           VerticalAlignment="Center" Margin="11,0,32,0" IsHitTestVisible="False" />
-                        <TextBlock x:Name="Placeholder" Text="Выберите приложение" Foreground="{StaticResource Muted}"
-                                   VerticalAlignment="Center" Margin="11,0,32,0" IsHitTestVisible="False" Visibility="Collapsed" />
+                        <ContentControl x:Name="Placeholder" Content="{TemplateBinding Tag}" Foreground="{StaticResource Muted}"
+                                        VerticalAlignment="Center" Margin="11,0,32,0" IsHitTestVisible="False" Focusable="False" Visibility="Collapsed" />
                         <Popup x:Name="PART_Popup" Placement="Bottom" VerticalOffset="4" AllowsTransparency="True"
                                IsOpen="{TemplateBinding IsDropDownOpen}">
                             <Border Width="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
@@ -440,10 +440,11 @@
         <Setter Property="Foreground" Value="{StaticResource Text}" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusCue}" />
+        <Setter Property="Padding" Value="10,9" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Row" Padding="10,9" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+                    <Border x:Name="Row" Padding="{TemplateBinding Padding}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -452,6 +453,66 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Row" Property="Background" Value="#282D3E" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MemoryUsageMeter" TargetType="ProgressBar">
+        <Setter Property="Height" Value="5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid ClipToBounds="True">
+                        <Border x:Name="PART_Track" Background="{StaticResource Raised}" CornerRadius="2.5" />
+                        <Border x:Name="PART_Indicator" Background="{StaticResource Accent}" CornerRadius="2.5" HorizontalAlignment="Left" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DetailsExpander" TargetType="Expander">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <StackPanel>
+                        <ToggleButton x:Name="HeaderSite" FocusVisualStyle="{StaticResource FocusCue}" Cursor="Hand"
+                                      Foreground="{TemplateBinding Foreground}" Content="{TemplateBinding Header}"
+                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="HeaderRow" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
+                                            BorderThickness="1" CornerRadius="8" Padding="11,8">
+                                        <DockPanel>
+                                            <Path x:Name="Chevron" DockPanel.Dock="Right" Data="M 0,0 L 4,4 L 8,0"
+                                                  Stroke="{StaticResource Muted}" StrokeThickness="1.5"
+                                                  VerticalAlignment="Center" Margin="12,0,0,0" RenderTransformOrigin=".5,.5" />
+                                            <ContentPresenter VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="HeaderRow" Property="Background" Value="{StaticResource Raised}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Chevron" Property="RenderTransform">
+                                                <Setter.Value><RotateTransform Angle="180" /></Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter x:Name="Details" Margin="2,8,2,0" Visibility="Collapsed" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="Details" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

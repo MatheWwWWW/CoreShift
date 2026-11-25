@@ -20,14 +20,14 @@ public partial class MainWindow : Window
 {
     private sealed record Overview(
         PhysicalMemory? Memory, MemoryCommit? Commit, IReadOnlyList<PagefileUsage>? Pagefiles,
-        string Advice, bool HasErrors);
+        bool HasErrors);
 
     private sealed record PagefileRow(string Name, string Usage);
     private sealed record CleanRow(string Path, string Size);
     private sealed record CleanCategoryRow(string Heading, string Roots, string Skipped);
     private sealed record CleanPreview(List<TempFile> Candidates, List<CleanRow> Files, CleanCategoryRow[] Categories,
         long TotalBytes, bool IncludesWerQueue);
-    private sealed record ProfileApplicationRow(string ProcessName, string Label);
+    private sealed record ProfileApplicationRow(string ProcessName, ContextProfileManager.SelectedProcess Process, string Label);
     private sealed record TweakRow(WindowsTweak Tweak, string State, bool CanApply, bool CanRestore)
     {
         public string Name => Tweak.Name;
@@ -54,7 +54,7 @@ public partial class MainWindow : Window
     private CleanPreview? lastScan;
     private int cleanSelectionVersion;
     private CancellationTokenSource? profileStop;
-    private Task<bool>? profileTask;
+    private Task<ContextProfileManager.WatchResult>? profileTask;
     private bool loadingPcInfo;
     private bool refreshingOverview;
     private Overview? lastOverview;
@@ -88,6 +88,7 @@ public partial class MainWindow : Window
         CleanFontCache.Unchecked += CleanCategoryChanged;
         this.isElevated = isElevated;
         InitializePerformanceControls();
+        InitializeMemoryDiagnostics();
         AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
         ProfileEvents.ItemsSource = profileEvents;
 
@@ -119,6 +120,7 @@ public partial class MainWindow : Window
 
         initialized = true;
         UpdateOverviewPolling();
+        UpdateMemoryPolling();
         if (AppUpdater.IsInstalledCopy())
         {
             updateTimer.Start();
@@ -245,7 +247,6 @@ public partial class MainWindow : Window
                 SetMemory(overview.Memory, overview.Commit);
             if (lastOverview is null || !SamePagefiles(lastOverview.Pagefiles, overview.Pagefiles))
                 SetPagefiles(overview.Pagefiles);
-            MemoryAdvice.Text = overview.Advice;
             SetStatus(RefreshStatus,
                 overview.HasErrors ? "Часть данных Windows недоступна" : "Обновляется автоматически каждую секунду",
                 overview.HasErrors);
@@ -275,9 +276,7 @@ public partial class MainWindow : Window
 
         var snapshot = Read(MemoryAndPagefileManager.ReadMemorySnapshot);
         var pagefiles = Read(MemoryAndPagefileManager.ReadLivePagefiles);
-        var dump = Read(MemoryAndPagefileManager.ReadCrashDumpSettings);
-        string advice = MemoryAndPagefileManager.ExplainManualSizing(snapshot?.Physical.TotalBytes, snapshot?.Commit, dump);
-        return new Overview(snapshot?.Physical, snapshot?.Commit, pagefiles, advice, hasErrors);
+        return new Overview(snapshot?.Physical, snapshot?.Commit, pagefiles, hasErrors);
     }
 
     private void SetMemory(PhysicalMemory? memory, MemoryCommit? commit)
@@ -331,38 +330,6 @@ public partial class MainWindow : Window
         PagefileDetail.Visibility = VisibleWhen(files is null or { Count: 0 });
         PagefileItems.ItemsSource = files?.Select(file => new PagefileRow(file.Name,
             $"Занято {FormatMiB(file.CurrentMiB)}  ·  Выделено {FormatMiB(file.AllocatedMiB)}  ·  Пик {FormatMiB(file.PeakMiB)}")).ToArray();
-    }
-
-    private async void TrimClick(object sender, RoutedEventArgs e)
-    {
-        if (!int.TryParse(TrimPid.Text, out int pid) || pid <= 0)
-        {
-            SetStatus(TrimStatus, "Введите положительный числовой PID.", error: true);
-            TrimPid.Focus();
-            return;
-        }
-
-        TrimButton.IsEnabled = false;
-        TrimPid.IsEnabled = false;
-        SetStatus(TrimStatus, $"Сбрасываем рабочий набор PID {pid}…");
-        try
-        {
-            await RunInBackground(() =>
-            {
-                MemoryOptimizer.TrimWorkingSet(pid);
-                return pid;
-            });
-            SetStatus(TrimStatus, $"Рабочий набор PID {pid} сброшен.");
-        }
-        catch (Exception ex) when (IsSystemError(ex))
-        {
-            SetStatus(TrimStatus, ex.Message, error: true);
-        }
-        finally
-        {
-            TrimPid.IsEnabled = true;
-            TrimButton.IsEnabled = true;
-        }
     }
 
     private bool HasCleanSelection => CleanTemp.IsChecked == true ||
@@ -614,7 +581,7 @@ public partial class MainWindow : Window
 
     private async Task RefreshProfileApplicationsAsync()
     {
-        if (loadingProfileApplications || profileStop is not null)
+        if (loadingProfileApplications || profileStop is not null || closing)
             return;
 
         var selected = ProfileApplication.SelectedItem as ProfileApplicationRow;
@@ -625,9 +592,11 @@ public partial class MainWindow : Window
         try
         {
             var applications = await RunInBackground(ReadProfileApplications);
+            if (closing)
+                return;
+
             ProfileApplication.ItemsSource = applications;
-            ProfileApplication.SelectedItem = applications.FirstOrDefault(app =>
-                string.Equals(app.ProcessName, selected?.ProcessName, StringComparison.OrdinalIgnoreCase));
+            ProfileApplication.SelectedItem = applications.FirstOrDefault(app => app.Process == selected?.Process);
             ProfileApplicationStatus.Visibility = VisibleWhen(applications.Length == 0);
             if (applications.Length == 0)
                 SetStatus(ProfileApplicationStatus, "Откройте нужное приложение и нажмите «Обновить».");
@@ -645,7 +614,7 @@ public partial class MainWindow : Window
 
     private static ProfileApplicationRow[] ReadProfileApplications()
     {
-        var applications = new Dictionary<string, ProfileApplicationRow>(StringComparer.OrdinalIgnoreCase);
+        var applications = new List<ProfileApplicationRow>();
         foreach (var process in Process.GetProcesses())
         {
             using (process)
@@ -657,8 +626,11 @@ public partial class MainWindow : Window
 
                     string name = process.ProcessName;
                     string title = process.MainWindowTitle.Trim();
-                    string label = title.Length > 0 ? $"{name}.exe — {title}" : $"{name}.exe";
-                    applications.TryAdd(name, new ProfileApplicationRow(name, label));
+                    var identity = new ContextProfileManager.SelectedProcess(process.Id, process.StartTime.ToUniversalTime());
+                    string label = $"{name}.exe · PID {identity.Id}";
+                    if (title.Length > 0)
+                        label += $" — {title}";
+                    applications.Add(new ProfileApplicationRow(name, identity, label));
                 }
                 catch (Exception ex) when (IsSystemError(ex))
                 {
@@ -667,20 +639,20 @@ public partial class MainWindow : Window
             }
         }
 
-        return applications.Values.OrderBy(app => app.Label, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        return applications.OrderBy(app => app.Label, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
     private void ProfileApplicationChanged(object sender, SelectionChangedEventArgs e) => UpdateProfileControls();
 
     private async void StartProfileClick(object sender, RoutedEventArgs e)
     {
-        if (loadingProfileApplications || profileStop is not null || ProfileApplication.SelectedItem is not ProfileApplicationRow app)
+        if (loadingProfileApplications || profileStop is not null || closing || ProfileApplication.SelectedItem is not ProfileApplicationRow app)
             return;
 
         var priority = AbovePriority.IsChecked == true ? ProcessPriorityClass.AboveNormal
             : NormalPriority.IsChecked == true ? ProcessPriorityClass.Normal : ProcessPriorityClass.BelowNormal;
         string name = app.ProcessName;
-        var profile = new ContextProfileManager(name, priority, ProfileGamePower.IsChecked == true);
+        var profile = new ContextProfileManager(name, priority, ProfileGamePower.IsChecked == true, app.Process);
         using var stop = new CancellationTokenSource();
         profileStop = stop;
         UpdateProfileControls();
@@ -694,19 +666,27 @@ public partial class MainWindow : Window
                 profileEvents.RemoveAt(8);
         });
 
+        bool processExited = false;
         try
         {
             profileTask = Task.Run(() => profile.Watch(stop.Token, () =>
             {
                 Dispatcher.InvokeAsync(() =>
                 {
-                    if (!stop.IsCancellationRequested)
+                    if (ReferenceEquals(profileStop, stop) && !stop.IsCancellationRequested && profileTask is { IsCompleted: false })
                         SetStatus(ProfileStatus, $"Наблюдение за {name}.exe активно.");
                 });
-            }, Report));
-            bool restored = await profileTask;
-            SetStatus(ProfileStatus, restored ? "Профиль остановлен." : "Не удалось полностью восстановить настройки профиля. См. журнал ниже.",
-                error: !restored);
+            }, Report, (pid, startedUtc) => Dispatcher.InvokeAsync(() =>
+            {
+                if (!closing && ReferenceEquals(profileStop, stop) && !stop.IsCancellationRequested &&
+                    profileTask is { IsCompleted: false })
+                    StartMemorySession(name, new ProcessMemoryKey(pid, startedUtc));
+            })));
+            var result = await profileTask;
+            processExited = result.ProcessExited;
+            string status = !result.Restored ? "Не удалось полностью восстановить настройки профиля. См. журнал ниже." :
+                processExited ? $"Приложение {name}.exe завершилось. Профиль остановлен автоматически." : "Профиль остановлен.";
+            SetStatus(ProfileStatus, status, error: !result.Restored);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
@@ -714,10 +694,14 @@ public partial class MainWindow : Window
         }
         finally
         {
+            FinishMemorySession();
             profileStop = null;
             profileTask = null;
             UpdateProfileControls();
         }
+
+        if (processExited && !closing)
+            await RefreshProfileApplicationsAsync();
     }
 
     private void StopProfileClick(object sender, RoutedEventArgs e)
@@ -782,6 +766,7 @@ public partial class MainWindow : Window
     {
         closing = true;
         overviewTimer.Stop();
+        memoryTimer.Stop();
         WindowSurface.IsEnabled = false;
         profileStop?.Cancel();
         var activeProfile = profileTask;
@@ -794,7 +779,7 @@ public partial class MainWindow : Window
         bool restored = true;
         if (activeProfile is not null)
         {
-            try { restored = await activeProfile; }
+            try { restored = (await activeProfile).Restored; }
             catch (Exception ex) when (IsSystemError(ex))
             {
                 restored = false;
@@ -815,6 +800,7 @@ public partial class MainWindow : Window
         closing = false;
         ShowFromTray();
         UpdateOverviewPolling();
+        UpdateMemoryPolling();
     }
 
     private void CloseForExit()
@@ -834,6 +820,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         overviewTimer.Stop();
+        memoryTimer.Stop();
         updateTimer.Stop();
         updateLifetime.Cancel();
         updateLifetime.Dispose();
@@ -857,6 +844,7 @@ public partial class MainWindow : Window
     private void OnWindowStateChanged(object? sender, EventArgs e)
     {
         UpdateOverviewPolling();
+        UpdateMemoryPolling();
         bool maximized = WindowState == WindowState.Maximized;
         MaximizeGlyph.Data = Geometry.Parse(maximized ? "M 0,3 H 7 V 10 H 0 Z M 3,3 V 0 H 10 V 7 H 7" : "M 0,0 H 9 V 9 H 0 Z");
         string action = maximized ? "Восстановить размер" : "Развернуть";

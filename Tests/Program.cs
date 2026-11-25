@@ -25,6 +25,7 @@ if (args is ["--performance"])
 {
     CheckTweakRestore();
     CheckContextProfile();
+    CheckContextProfileStopsOnSelectedExit();
     return;
 }
 
@@ -38,6 +39,8 @@ CheckFontCache();
 CheckTweakRestore();
 CheckPagefileAdvice();
 CheckContextProfile();
+CheckContextProfileStopsOnSelectedExit();
+CheckProcessMemoryTrim();
 
 static void CheckTempCleanup()
 {
@@ -422,13 +425,38 @@ static void CheckTweakRestore()
 static void CheckPagefileAdvice()
 {
     const ulong gib = 1024 * 1024 * 1024;
-    var commit = new MemoryCommit(12 * gib, 16 * gib);
+    var commit = new MemoryCommit(10 * gib, 12 * gib, 16 * gib);
     var dump = new CrashDumpSettings(1, false);
     string advice = MemoryAndPagefileManager.ExplainManualSizing(8 * gib, commit, dump);
     Require(advice.Contains("4096") && advice.Contains("8449"), "Manual advice must include the observed workload and full dump requirements.");
+    Require(commit.AvailableBytes == 6 * gib && (commit with { CurrentBytes = 17 * gib }).AvailableBytes == 0,
+        "Commit headroom must use current commit, and clamp at zero.");
     advice = MemoryAndPagefileManager.ExplainManualSizing(null, commit, dump);
     Require(!advice.Contains("4096") && advice.Contains("нужны объём ОЗУ"), "Unknown RAM should be reported as unknown.");
     Console.WriteLine("PASS pagefile advice");
+}
+
+static void CheckProcessMemoryTrim()
+{
+    using var child = StartIdleChild();
+    try
+    {
+        DateTime started = child.StartTime.ToUniversalTime();
+        bool rejected = false;
+        try { MemoryOptimizer.TrimWorkingSet(child.Id, started.AddSeconds(-1)); }
+        catch (InvalidOperationException) { rejected = true; }
+        Require(rejected, "The trim operation must reject a reused PID.");
+
+        var (before, after) = MemoryOptimizer.TrimWorkingSet(child.Id, started);
+        Require(before > 0 && after.HasValue && !child.HasExited,
+            "Trim must measure the working set of the same process before and after, while it remains running.");
+        Console.WriteLine("PASS process memory trim and identity");
+    }
+    finally
+    {
+        if (!child.HasExited)
+            child.Kill();
+    }
 }
 
 static void CheckContextProfile()
@@ -442,8 +470,11 @@ static void CheckContextProfile()
         var profile = new ContextProfileManager(child.ProcessName, desired);
         var log = new List<string>();
         profile.Observe(Environment.ProcessId, log.Add);
-        profile.Observe(child.Id, log.Add);
+        (int Pid, DateTime CreatedUtc)? focused = null;
+        profile.Observe(child.Id, log.Add, (pid, startedUtc) => focused = (pid, startedUtc));
         child.Refresh();
+        Require(focused == (child.Id, child.StartTime.ToUniversalTime()),
+            "The focus profile must report the identity of the process that entered focus.");
         Require(child.PriorityClass == desired, string.Join(Environment.NewLine, log));
 
         profile.Observe(Environment.ProcessId, log.Add);
@@ -468,6 +499,62 @@ static void CheckContextProfile()
     {
         if (!child.HasExited)
             child.Kill();
+    }
+}
+
+static void CheckContextProfileStopsOnSelectedExit()
+{
+    using var selected = StartIdleChild();
+    using var other = StartIdleChild();
+    using var mutex = new Mutex();
+    using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+    var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    Task<ContextProfileManager.WatchResult>? watching = null;
+    try
+    {
+        var identity = new ContextProfileManager.SelectedProcess(selected.Id, selected.StartTime.ToUniversalTime());
+        var stale = new ContextProfileManager(selected.ProcessName, ProcessPriorityClass.AboveNormal,
+            selected: identity with { StartedUtc = identity.StartedUtc.AddSeconds(-1) });
+        var staleResult = stale.Watch(mutex, stop.Token, () => throw new InvalidOperationException("The PID belonged to a different process."),
+            _ => { });
+        Require(staleResult is { Restored: true, ProcessExited: true }, "A stale selection must be treated as closed.");
+
+        var profile = new ContextProfileManager(selected.ProcessName, ProcessPriorityClass.AboveNormal, selected: identity);
+        bool focused = false;
+        profile.Observe(other.Id, _ => { }, (_, _) => focused = true);
+        Require(!focused, "Another instance of the same executable must not receive the selected profile.");
+
+        // The selected child has no window. Its exit must stop the watcher even without a focus change.
+        watching = Task.Run(() => profile.Watch(mutex, stop.Token, started.SetResult, _ => { }));
+        var first = Task.WhenAny(started.Task, watching, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+        if (first == watching)
+        {
+            var result = watching.GetAwaiter().GetResult();
+            throw new InvalidOperationException($"The selected profile ended before startup: {result}.");
+        }
+        Require(first == started.Task, "The selected profile did not start.");
+        Require(!watching.IsCompleted, "A running background application must keep its profile.");
+        selected.StandardInput.Close();
+        Require(watching.Wait(TimeSpan.FromSeconds(5)) && watching.Result is { Restored: true, ProcessExited: true },
+            "The profile did not stop automatically after its selected process exited.");
+        Require(!other.HasExited, "A running instance of the same executable must not affect automatic stop.");
+
+        using var manualStop = new CancellationTokenSource();
+        var next = new ContextProfileManager(other.ProcessName, ProcessPriorityClass.AboveNormal,
+            selected: new ContextProfileManager.SelectedProcess(other.Id, other.StartTime.ToUniversalTime()));
+        Require(next.Watch(mutex, manualStop.Token, manualStop.Cancel, _ => { }) is { Restored: true, ProcessExited: false },
+            "An automatically stopped profile must release control for the next profile.");
+        Console.WriteLine("PASS automatic focus profile stop on selected background process exit");
+    }
+    finally
+    {
+        stop.Cancel();
+        if (!selected.HasExited)
+            selected.Kill();
+        if (!other.HasExited)
+            other.Kill();
+        if (watching is { IsCompleted: false })
+            watching.Wait(TimeSpan.FromSeconds(5));
     }
 }
 

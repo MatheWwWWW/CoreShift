@@ -6,7 +6,10 @@ using Microsoft.Win32;
 namespace SmartResourceDispatcher.Core;
 
 internal sealed record PagefileUsage(string Name, uint? AllocatedMiB, uint? CurrentMiB, uint? PeakMiB);
-internal sealed record MemoryCommit(ulong PeakBytes, ulong LimitBytes);
+internal sealed record MemoryCommit(ulong CurrentBytes, ulong PeakBytes, ulong LimitBytes)
+{
+    public ulong AvailableBytes => LimitBytes - Math.Min(CurrentBytes, LimitBytes);
+}
 internal sealed record PhysicalMemory(ulong TotalBytes, ulong AvailableBytes);
 internal sealed record MemorySnapshot(PhysicalMemory Physical, MemoryCommit Commit);
 internal sealed record CrashDumpSettings(int? Mode, bool HasDedicatedFile);
@@ -68,15 +71,28 @@ internal static class MemoryAndPagefileManager
 
     internal static MemoryCommit ReadCommit()
     {
-        var info = ReadPerformanceInformation();
-        return new MemoryCommit((ulong)info.CommitPeak * info.PageSize, (ulong)info.CommitLimit * info.PageSize);
+        return ReadMemorySnapshot().Commit;
     }
 
     internal static MemorySnapshot ReadMemorySnapshot()
     {
         var info = ReadPerformanceInformation();
         return new MemorySnapshot(new PhysicalMemory((ulong)info.PhysicalTotal * info.PageSize, (ulong)info.PhysicalAvailable * info.PageSize),
-            new MemoryCommit((ulong)info.CommitPeak * info.PageSize, (ulong)info.CommitLimit * info.PageSize));
+            new MemoryCommit((ulong)info.CommitTotal * info.PageSize, (ulong)info.CommitPeak * info.PageSize,
+                (ulong)info.CommitLimit * info.PageSize));
+    }
+
+    internal static bool? ReadAutomaticPagefileManagement()
+    {
+        using var query = new ManagementObjectSearcher("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem");
+        using var results = query.Get();
+        foreach (ManagementObject result in results)
+        {
+            using (result)
+                return result["AutomaticManagedPagefile"] as bool?;
+        }
+
+        return null;
     }
 
     private static PerformanceInformation ReadPerformanceInformation()
@@ -106,7 +122,9 @@ internal static class MemoryAndPagefileManager
         if (ramBytes is > 0 && commit is not null)
         {
             ulong workloadBytes = commit.PeakBytes > ramBytes.Value ? commit.PeakBytes - ramBytes.Value : 0;
-            notes.Add($"По пику с последней загрузки сверх ОЗУ потребовалось около {(workloadBytes + mib - 1) / mib} Mb. Это оценка без запаса на будущую нагрузку.");
+            notes.Add(workloadBytes == 0
+                ? "Пик выделенной памяти с последней загрузки укладывался в объём ОЗУ."
+                : $"Пик выделенной памяти с последней загрузки превысил объём ОЗУ на {(workloadBytes + mib - 1) / mib} МБ. Разница помогает оценить размер подкачки без запаса на рост нагрузки.");
         }
         else
         {
@@ -119,9 +137,9 @@ internal static class MemoryAndPagefileManager
             notes.Add(dump?.Mode switch
             {
                 0 => "Системные дампы отключены.",
-                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} Mb.",
-                1 => "Для полного дампа нужен объём ОЗУ плюс 257 Mb.",
-                3 => "Для малого дампа нужен минимум 1 Mb.",
+                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} МБ.",
+                1 => "Для полного дампа нужен объём ОЗУ плюс 257 МБ.",
+                3 => "Для малого дампа нужен минимум 1 МБ.",
                 2 or 7 or 10 => "Точный минимум для выбранного системного дампа зависит от его объёма.",
                 _ => "Режим системных дампов неизвестен. Проверьте его перед ручной настройкой."
             });

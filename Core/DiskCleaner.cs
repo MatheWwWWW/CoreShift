@@ -339,7 +339,7 @@ internal static class DiskCleaner
 
     internal static string FormatBytes(long bytes)
     {
-        string[] units = ["Б", "КиБ", "Mb", "Gb", "ТиБ"];
+        string[] units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
         double size = bytes;
         int unit = 0;
         while (size >= 1024 && unit < units.Length - 1)

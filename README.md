@@ -59,6 +59,12 @@ dotnet build Desktop/CoreShift.Desktop.csproj --no-restore
 dotnet run --project Desktop/CoreShift.Desktop.csproj --no-build
 ```
 
+Если репозиторий находится в `D:\CoreShift`, графический интерфейс можно запустить в PowerShell по полному пути.
+
+```powershell
+dotnet run --project D:\CoreShift\Desktop\CoreShift.Desktop.csproj
+```
+
 Предпросмотр очистки без удаления из консоли: `dotnet run -- clean --dry-run`.
 
 ## Выпуск обновления
