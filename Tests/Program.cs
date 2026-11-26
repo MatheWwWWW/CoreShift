@@ -24,6 +24,7 @@ if (args is ["--cache-preview"])
 if (args is ["--performance"])
 {
     CheckTweakRestore();
+    CheckPagefileIncrease();
     CheckContextProfile();
     CheckContextProfileStopsOnSelectedExit();
     return;
@@ -37,6 +38,7 @@ CheckNvidiaCaches();
 CheckWindowsReports();
 CheckFontCache();
 CheckTweakRestore();
+CheckPagefileIncrease();
 CheckPagefileAdvice();
 CheckContextProfile();
 CheckContextProfileStopsOnSelectedExit();
@@ -420,6 +422,59 @@ static void CheckTweakRestore()
     {
         Registry.CurrentUser.DeleteSubKeyTree(path, throwOnMissingSubKey: false);
     }
+}
+
+static void CheckPagefileIncrease()
+{
+    const string windowsDrive = @"C:\";
+    const string systemFile = @"C:\pagefile.sys";
+    const string otherFile = @"D:\pagefile.sys";
+    const string setting = "PagingFiles";
+    string[] automatic = [@"?:\pagefile.sys"];
+    var active = new PagefileUsage[] { new(otherFile, 1024, 0, 0), new(systemFile, 4096, 0, 0) };
+    var target = PagefileIncrease.SelectTarget(automatic, windowsDrive, active);
+    Require(target.Automatic && target.Path == systemFile && target.Allocated == 4096 && target.Position == 1 &&
+        target.OtherEntries.SequenceEqual([$"{otherFile} 0 0"]), "The automatic configuration must retain other active paging files.");
+
+    string[] manual = [$"{otherFile} 512 2048", $"{systemFile} 2048 16384"];
+    target = PagefileIncrease.SelectTarget(manual, windowsDrive, active);
+    Require(!target.Automatic && target.Maximum == 16384 && target.Position == 1 &&
+        target.OtherEntries.SequenceEqual([manual[0]]), "The system volume is preferred and other manual entries must be preserved.");
+    var state = new PagefileIncrease.State(target, false, 4097, 8192, 16384, 12288, 0, null);
+    Require(state.Accepts(8192, 16384) && !state.Accepts(4096, 16384) && !state.Accepts(8192, 12288) &&
+        !state.Accepts(12289, 16384), "The new initial size must fit and increase, while the old maximum is preserved.");
+
+    string path = $@"SOFTWARE\CoreShift.PagefileChecks.{Guid.NewGuid():N}";
+    try
+    {
+        using var hive = Registry.CurrentUser.CreateSubKey(path);
+        using var settings = hive.CreateSubKey("Settings");
+        using var backups = hive.CreateSubKey("Backups");
+        settings.SetValue(setting, automatic, RegistryValueKind.MultiString);
+        Require(PagefileIncrease.UpdateConfiguration(settings, backups, automatic, manual), "The new configuration should be written.");
+
+        string[] external = [$"{systemFile} 8192 16384"];
+        settings.SetValue(setting, external, RegistryValueKind.MultiString);
+        try
+        {
+            PagefileIncrease.UpdateConfiguration(settings, backups, external, null);
+            throw new Exception("Restore overwrote an external change.");
+        }
+        catch (InvalidOperationException)
+        {
+            Require(((string[])settings.GetValue(setting)!).SequenceEqual(external), "The external configuration must be retained.");
+        }
+
+        settings.SetValue(setting, manual, RegistryValueKind.MultiString);
+        Require(PagefileIncrease.UpdateConfiguration(settings, backups, manual, null) &&
+            ((string[])settings.GetValue(setting)!).SequenceEqual(automatic), "Restore must recover the exact automatic configuration.");
+        settings.DeleteValue(setting);
+        Require(PagefileIncrease.UpdateConfiguration(settings, backups, null, manual) &&
+            PagefileIncrease.UpdateConfiguration(settings, backups, manual, null) && settings.GetValue(setting) is null,
+            "Restore must remove a value that was originally absent.");
+        Console.WriteLine("PASS pagefile sizing, conflicts and restore");
+    }
+    finally { Registry.CurrentUser.DeleteSubKeyTree(path, throwOnMissingSubKey: false); }
 }
 
 static void CheckPagefileAdvice()

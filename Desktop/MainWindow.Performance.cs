@@ -28,7 +28,8 @@ public partial class MainWindow
         }
     }
 
-    private Task RefreshPerformanceAsync() => Task.WhenAll(RefreshDownloadLimitAsync(), RefreshIndexExclusionsAsync());
+    private Task RefreshPerformanceAsync() => Task.WhenAll(RefreshDownloadLimitAsync(), RefreshIndexExclusionsAsync(),
+        RefreshPagefileTweakAsync(), RefreshWindowEffectsAsync());
 
     private async Task RefreshDownloadLimitAsync()
     {

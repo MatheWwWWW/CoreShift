@@ -859,7 +859,7 @@ public partial class MainWindow : Window
     }
 
     private static bool IsSystemError(Exception ex) => ex is ArgumentException or InvalidOperationException
-        or IOException or UnauthorizedAccessException or SecurityException or Win32Exception or ManagementException or COMException;
+        or IOException or InvalidDataException or UnauthorizedAccessException or SecurityException or Win32Exception or ManagementException or COMException;
 
     private static string FormatBytes(ulong? bytes) => bytes is { } value ? DiskCleaner.FormatBytes((long)value) : "—";
     private static string FormatMiB(uint? mib) => FormatBytes(mib is { } value ? (ulong)value * 1024 * 1024 : null);
