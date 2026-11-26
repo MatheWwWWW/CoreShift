@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security;
 using System.Security.Cryptography;
@@ -20,6 +21,7 @@ internal static class AppUpdater
     internal const string WorkerReadyPrefix = @"Local\CoreShift.998EEA5D.UpdateReady.";
     internal const string ExecutableName = "CoreShift.Desktop.exe";
     private const string Repository = "MatheWwWWW/CoreShift";
+    private const string LatestReleasePath = "latest";
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{998EEA5D-ED30-49E3-A992-FF2AC2A9D7BB}_is1";
     private const long MaxInstallerSize = 250 * 1024 * 1024;
     private static readonly string[] WorkerLibraries =
@@ -59,7 +61,7 @@ internal static class AppUpdater
 
     internal static async Task<AppRelease?> FetchLatestAsync(CancellationToken cancellationToken)
     {
-        var release = await FetchReleaseAsync("latest", cancellationToken);
+        var release = await FetchReleaseAsync(LatestReleasePath, cancellationToken);
         if (release is not { Draft: false, Prerelease: false, TagName: { Length: > 0 }, Assets: not null })
             return null;
 
@@ -92,6 +94,8 @@ internal static class AppUpdater
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repository}/releases/{path}");
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        if (path == LatestReleasePath)
+            request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
         using var response = await Client.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;

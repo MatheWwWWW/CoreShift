@@ -10,6 +10,7 @@ namespace CoreShift.Desktop;
 
 public partial class UpdateWindow : Window
 {
+    private const int ErrorCancelled = 1223;
     private readonly Process previousApp;
     private readonly string installDirectory;
     private readonly Version requestedVersion;
@@ -18,6 +19,7 @@ public partial class UpdateWindow : Window
     private bool running = true;
     private bool downloading;
     private bool installing;
+    private bool installationCompleted;
     private bool restartRequired;
 
     internal UpdateWindow(Process previousApp, string installDirectory, Version requestedVersion, Action releaseUpdateMutex)
@@ -78,6 +80,7 @@ public partial class UpdateWindow : Window
             if (installerExitCode != 0)
                 throw new InvalidOperationException($"CoreShift Setup exited with {installerExitCode}. See {logPath}.");
 
+            installationCompleted = true;
             ShowResult("Обновление установлено", "Открываем CoreShift…", "Открыть CoreShift", enableAction: false);
             if (SystemParameters.ClientAreaAnimation)
                 await Task.Delay(260);
@@ -151,14 +154,19 @@ public partial class UpdateWindow : Window
 
     private void ShowFailure(string message)
     {
+        Heading.Text = "Обновление прервано";
+        SetProgress(0, showPercent: false);
+        ShowRetry(message);
+    }
+
+    private void ShowRetry(string message)
+    {
         running = false;
         downloading = installing = false;
-        Heading.Text = "Обновление прервано";
         Stage.Text = message;
         Stage.Foreground = (Brush)FindResource("Warning");
         ActionButton.Content = "Открыть CoreShift";
         ActionButton.IsEnabled = true;
-        SetProgress(0, showPercent: false);
     }
 
     private void ActionClick(object sender, RoutedEventArgs e)
@@ -200,14 +208,25 @@ public partial class UpdateWindow : Window
         try
         {
             releaseUpdateMutex();
-            using var application = AppUpdater.StartProcess(Path.Combine(installDirectory, AppUpdater.ExecutableName), []);
+            string executable = Path.Combine(installDirectory, AppUpdater.ExecutableName);
+            using var application = Process.Start(new ProcessStartInfo(executable)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = installDirectory
+            });
             running = false;
             Close();
         }
         catch (Exception ex) when (AppUpdater.IsUpdateError(ex))
         {
             Debug.WriteLine(ex);
-            ShowFailure("Не удалось открыть CoreShift. Попробуйте ещё раз.");
+            string message = ex is Win32Exception { NativeErrorCode: ErrorCancelled }
+                ? "Запуск отменён. При повторной попытке подтвердите запрос Windows."
+                : "Не удалось открыть CoreShift. Попробуйте ещё раз или откройте его из меню «Пуск».";
+            if (installationCompleted)
+                ShowRetry(message);
+            else
+                ShowFailure(message);
         }
     }
 }
