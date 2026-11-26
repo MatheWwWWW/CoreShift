@@ -54,11 +54,9 @@ public partial class MainWindow
                 0 => "В политике задан автоматический лимит.",
                 var percent => $"В политике задан лимит {percent}%.",
             };
-            if (unsupported is null && !isElevated)
-                DownloadLimitState.Text += " Для применения политики нужны права администратора.";
             DownloadLimitValue.Text = (state.Current is >= 1 and <= 100 ? state.Current.Value : tweak.AppliedValue)
                 .ToString(CultureInfo.CurrentCulture);
-            SetDownloadLimitControls(isElevated && unsupported is null, isElevated && state.HasBackup);
+            SetDownloadLimitControls(unsupported is null, state.HasBackup);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
@@ -90,7 +88,7 @@ public partial class MainWindow
 
     private async Task ChangeDownloadLimitAsync(WindowsTweak tweak, bool restore)
     {
-        if (workingWithDownloadLimit || !isElevated)
+        if (workingWithDownloadLimit)
             return;
 
         workingWithDownloadLimit = true;
@@ -144,8 +142,6 @@ public partial class MainWindow
             IndexExclusionsList.ItemsSource = folders;
             IndexExclusionsList.Visibility = VisibleWhen(folders.Length > 0);
             IndexExclusionsList.SelectedItem = folders.Contains(selected, StringComparer.OrdinalIgnoreCase) ? selected : folders.FirstOrDefault();
-            if (!isElevated)
-                SetStatus(IndexExclusionStatus, "Для изменения исключений из CoreShift нужны права администратора.");
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
@@ -157,7 +153,7 @@ public partial class MainWindow
 
     private void UpdateIndexExclusionControls()
     {
-        AddIndexExclusionButton.IsEnabled = isElevated && !workingWithIndexExclusions;
+        AddIndexExclusionButton.IsEnabled = !workingWithIndexExclusions;
         RestoreIndexExclusionButton.IsEnabled = AddIndexExclusionButton.IsEnabled && IndexExclusionsList.SelectedItem is string;
     }
 
@@ -176,7 +172,7 @@ public partial class MainWindow
 
     private async Task ChangeIndexExclusionAsync(string folder, bool restore)
     {
-        if (workingWithIndexExclusions || !isElevated)
+        if (workingWithIndexExclusions)
             return;
 
         workingWithIndexExclusions = true;

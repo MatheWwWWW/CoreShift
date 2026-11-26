@@ -16,6 +16,12 @@
           "System.Management": "10.0.2"
         }
       },
+      "Markdig": {
+        "type": "Direct",
+        "requested": "[1.6.0, )",
+        "resolved": "1.6.0",
+        "contentHash": "rJEpDfPM8wrfXUgkNejjg2bJN9bciy44uVyRwKUI+92CnSmbaLeJTLPYcCdvgM4RFsKrhs8d2H2hO78yZpMl3g=="
+      },
       "BlackSharp.Core": {
         "type": "Transitive",
         "resolved": "1.0.7",

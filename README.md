@@ -37,7 +37,7 @@
 
 ## Графический интерфейс CoreShift
 
-Запуск на Windows: `dotnet run --project Desktop/CoreShift.Desktop.csproj`.
+CoreShift запускается с правами администратора. Команды для запуска из исходников приведены ниже.
 
 Вкладка **«Обзор»** обновляет использование ОЗУ, лимит и пик выделенной памяти и данные файлов подкачки каждую секунду, пока окно и вкладка видны.
 
@@ -51,24 +51,48 @@
 
 ## Запуск и сборка
 
-Установите [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0) версии из [`global.json`](global.json). Выполните из корня репозитория на Windows:
+Из корня репозитория проверьте версию SDK командой `dotnet --version`. Если SDK из [`global.json`](global.json) отсутствует, установите [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0). Если SDK подготовлен в `obj\verification-sdk-11`, его также можно вызвать напрямую через `.\obj\verification-sdk-11\dotnet.exe`.
+
+Для сборки из корня репозитория выполните следующие команды.
 
 ```powershell
 dotnet restore Desktop/CoreShift.Desktop.csproj --locked-mode
 dotnet build Desktop/CoreShift.Desktop.csproj --no-restore
-dotnet run --project Desktop/CoreShift.Desktop.csproj --no-build
 ```
 
-Если репозиторий находится в `D:\CoreShift`, графический интерфейс можно запустить в PowerShell по полному пути.
+Для запуска из исходников откройте PowerShell от имени администратора и выполните из корня репозитория следующую команду.
 
 ```powershell
-dotnet run --project D:\CoreShift\Desktop\CoreShift.Desktop.csproj
+dotnet run --project .\Desktop\CoreShift.Desktop.csproj
 ```
+
+Для сборки `.exe` графического интерфейса выполните эту команду из корня репозитория.
+
+```powershell
+dotnet build .\Desktop\CoreShift.Desktop.csproj -c Release
+```
+
+Исполняемый файл появится в `Desktop\bin\Release\net11.0-windows\CoreShift.Desktop.exe`.
 
 Предпросмотр очистки без удаления из консоли: `dotnet run -- clean --dry-run`.
 
 ## Выпуск обновления
 
-Укажите новую версию в `Desktop/CoreShift.Desktop.csproj` и соберите её командой `./Installer/Build-Installer.ps1` с установленным Inno Setup 6.6 или новее. Скрипт создаёт `dist/CoreShift-Setup-<версия>-x64.exe`.
+Для сборки установщика Windows x64 из корня репозитория нужны .NET SDK и Inno Setup 6.6 или новее.
+
+```powershell
+.\Installer\Build-Installer.ps1 -Version 1.1.5
+```
+
+Подставьте нужную версию в `-Version`. Если опустить параметр, скрипт возьмёт версию из `Desktop/CoreShift.Desktop.csproj`. Для примера выше результатом будет `dist\CoreShift-Setup-1.1.5-x64.exe`.
+
+Если SDK, компилятор Inno Setup и пакеты подготовлены в локальной папке `obj`, укажите их пути явно.
+
+```powershell
+.\Installer\Build-Installer.ps1 -Version 1.1.5 `
+  -DotNet '.\obj\verification-sdk-11\dotnet.exe' `
+  -InnoCompiler '.\obj\installer-tools\inno-6.7.4\ISCC.exe' `
+  -PackageSource @('.\obj\verification-packages', '.\obj\installer-feed')
+```
 
 Прикрепите этот `.exe` к публичному релизу в [GitHub Releases](https://github.com/MatheWwWWW/CoreShift/releases) с тегом той же версии, например `1.0.4` или `v1.0.4`, и отметьте релиз как последний. CoreShift использует имя файла и контрольную сумму SHA-256 из GitHub Releases.

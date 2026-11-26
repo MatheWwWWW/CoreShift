@@ -2,6 +2,7 @@
   "sdk": {
     "version": "11.0.100",
     "rollForward": "latestPatch",
-    "allowPrerelease": false
+    "allowPrerelease": false,
+    "paths": ["$host$", "obj/verification-sdk-11"]
   }
 }

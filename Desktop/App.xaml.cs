@@ -11,12 +11,17 @@ public partial class App : Application
     private Mutex? updateMutex;
     private EventWaitHandle? showWindow;
     private RegisteredWaitHandle? showRegistration;
-    private EventWaitHandle? closeForElevation;
-    private RegisteredWaitHandle? closeForElevationRegistration;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        using var identity = WindowsIdentity.GetCurrent();
+        if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+        {
+            Shutdown(1);
+            return;
+        }
 
         if (e.Args is ["--update", var parent, var ready, var version])
         {
@@ -37,10 +42,7 @@ public partial class App : Application
             }
         }
 
-        using var identity = WindowsIdentity.GetCurrent();
-        bool isElevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-        string userName = $@"Local\CoreShift.998EEA5D.{identity.User!.Value}";
-        string instanceName = userName + (isElevated ? ".Administrator" : ".Standard");
+        string instanceName = $@"Local\CoreShift.998EEA5D.{identity.User!.Value}.Administrator";
         showWindow = new EventWaitHandle(false, EventResetMode.AutoReset, instanceName + ".Show");
         instanceMutex = new Mutex(true, instanceName, out bool firstInstance);
         if (!firstInstance)
@@ -50,35 +52,12 @@ public partial class App : Application
             return;
         }
 
-        var window = new MainWindow(isElevated);
+        var window = new MainWindow();
         MainWindow = window;
         showRegistration = ThreadPool.RegisterWaitForSingleObject(showWindow, (_, _) =>
             Dispatcher.InvokeAsync(window.ShowFromTray), null, Timeout.Infinite, executeOnlyOnce: false);
 
-        string closeRequestName = userName + ".Standard.CloseForElevation";
-        if (!isElevated)
-        {
-            closeForElevation = new EventWaitHandle(false, EventResetMode.AutoReset, closeRequestName);
-            closeForElevationRegistration = ThreadPool.RegisterWaitForSingleObject(closeForElevation, (_, _) =>
-                Dispatcher.InvokeAsync(window.ExitAsync), null, Timeout.Infinite, executeOnlyOnce: false);
-        }
-
         window.Show();
-        if (isElevated)
-        {
-            try
-            {
-                if (EventWaitHandle.TryOpenExisting(closeRequestName, out var request))
-                {
-                    using (request)
-                        request.Set();
-                }
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                Debug.WriteLine(ex);
-            }
-        }
     }
 
     private void StartUpdateWorker(string parent, string ready, string version)
@@ -155,8 +134,6 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        closeForElevationRegistration?.Unregister(null);
-        closeForElevation?.Dispose();
         showRegistration?.Unregister(null);
         showWindow?.Dispose();
         instanceMutex?.Dispose();

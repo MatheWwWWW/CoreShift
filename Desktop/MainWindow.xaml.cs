@@ -10,7 +10,6 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Microsoft.Win32;
 using SmartResourceDispatcher.Core;
 using Tray = System.Windows.Forms;
 
@@ -42,7 +41,6 @@ public partial class MainWindow : Window
         };
     }
 
-    private readonly bool isElevated;
     private readonly Tray.NotifyIcon trayIcon;
     private readonly Tray.ContextMenuStrip trayMenu = new();
     private readonly System.Drawing.Icon? appIcon;
@@ -67,7 +65,7 @@ public partial class MainWindow : Window
     private bool installingUpdate;
     private AppRelease? availableUpdate;
 
-    internal MainWindow(bool isElevated)
+    internal MainWindow()
     {
         InitializeComponent();
         CleanTemp.Checked += CleanCategoryChanged;
@@ -86,10 +84,9 @@ public partial class MainWindow : Window
         CleanWerQueue.Unchecked += CleanCategoryChanged;
         CleanFontCache.Checked += CleanCategoryChanged;
         CleanFontCache.Unchecked += CleanCategoryChanged;
-        this.isElevated = isElevated;
         InitializePerformanceControls();
         InitializeMemoryDiagnostics();
-        AccessMode.Text = isElevated ? "Администратор" : "Обычный пользователь";
+        AppVersionText.Text = $"Версия {AppUpdater.CurrentVersion.ToString(3)}";
         ProfileEvents.ItemsSource = profileEvents;
 
         if (Environment.ProcessPath is { } exePath)
@@ -99,7 +96,7 @@ public partial class MainWindow : Window
         trayIcon = new Tray.NotifyIcon
         {
             Icon = appIcon ?? System.Drawing.SystemIcons.Application,
-            Text = isElevated ? "CoreShift (администратор)" : "CoreShift",
+            Text = "CoreShift",
             ContextMenuStrip = trayMenu,
             Visible = true
         };
@@ -153,6 +150,12 @@ public partial class MainWindow : Window
         {
             checkingUpdate = false;
         }
+    }
+
+    private void ShowReleaseNotesClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ReleaseNotesWindow { Owner = this };
+        dialog.ShowDialog();
     }
 
     private async void InstallUpdateClick(object sender, RoutedEventArgs e)
@@ -518,17 +521,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private TweakRow ReadTweak(WindowsTweak tweak)
+    private static TweakRow ReadTweak(WindowsTweak tweak)
     {
-        bool canWrite = isElevated || tweak.Hive == RegistryHive.CurrentUser;
         try
         {
             string? unsupported = TweaksEngine.SupportIssue(tweak);
             var (value, hasBackup) = TweaksEngine.ReadSetting(tweak);
             string state = unsupported ?? TweaksEngine.DescribeState(tweak, value);
-            if (unsupported is null && !canWrite)
-                state = $"{state.TrimEnd('.')}. Для изменения запустите CoreShift от имени администратора.";
-            return new TweakRow(tweak, state, canWrite && unsupported is null && value != tweak.AppliedValue, canWrite && hasBackup);
+            return new TweakRow(tweak, state, unsupported is null && value != tweak.AppliedValue, hasBackup);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {

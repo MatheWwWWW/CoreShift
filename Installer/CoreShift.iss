@@ -47,8 +47,8 @@ Name: "{group}\CoreShift"; Filename: "{app}\CoreShift.Desktop.exe"; WorkingDir: 
 Name: "{autodesktop}\CoreShift"; Filename: "{app}\CoreShift.Desktop.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\CoreShift.Desktop.exe"; Description: "{cm:LaunchProgram,CoreShift}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\CoreShift.Desktop.exe"; WorkingDir: "{app}"; Flags: nowait skipifnotsilent; Check: IsInAppUpdate
+Filename: "{app}\CoreShift.Desktop.exe"; Description: "{cm:LaunchProgram,CoreShift}"; Flags: nowait postinstall skipifsilent shellexec
+Filename: "{app}\CoreShift.Desktop.exe"; WorkingDir: "{app}"; Flags: nowait skipifnotsilent shellexec; Check: IsInAppUpdate
 
 [Code]
 const

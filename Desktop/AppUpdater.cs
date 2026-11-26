@@ -33,9 +33,11 @@ internal static class AppUpdater
     private sealed record GitHubAsset(string Name, string State, long Size, string? Digest);
     private sealed record GitHubRelease(
         [property: JsonPropertyName("tag_name")] string TagName,
-        bool Draft, bool Prerelease, GitHubAsset[] Assets);
+        bool Draft, bool Prerelease, GitHubAsset[] Assets, string? Body);
 
     static AppUpdater() => Client.DefaultRequestHeaders.UserAgent.ParseAdd("CoreShift-Updater");
+
+    internal static Version CurrentVersion { get; } = typeof(AppUpdater).Assembly.GetName().Version!;
 
     internal static bool IsInstalledCopy() => string.Equals(InstalledDirectory(),
         Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory), StringComparison.OrdinalIgnoreCase);
@@ -57,22 +59,14 @@ internal static class AppUpdater
 
     internal static async Task<AppRelease?> FetchLatestAsync(CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repository}/releases/latest");
-        request.Headers.Accept.ParseAdd("application/vnd.github+json");
-        using var response = await Client.SendAsync(request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return null;
-
-        response.EnsureSuccessStatusCode();
-        var release = await response.Content.ReadFromJsonAsync<GitHubRelease>(cancellationToken);
-        var current = typeof(AppUpdater).Assembly.GetName().Version!;
+        var release = await FetchReleaseAsync("latest", cancellationToken);
         if (release is not { Draft: false, Prerelease: false, TagName: { Length: > 0 }, Assets: not null })
             return null;
 
         string tag = release.TagName;
         string number = tag.StartsWith('v') ? tag[1..] : tag;
         if (!Version.TryParse(number, out var version) || version.Build < 0 || version.Revision != -1 ||
-            number != version.ToString(3) || new Version(version.Major, version.Minor, version.Build, 0) <= current)
+            number != version.ToString(3) || new Version(version.Major, version.Minor, version.Build, 0) <= CurrentVersion)
             return null;
 
         string name = $"CoreShift-Setup-{version}-x64.exe";
@@ -84,6 +78,26 @@ internal static class AppUpdater
 
         return new AppRelease(version, new Uri($"https://github.com/{Repository}/releases/download/{tag}/{name}"),
             asset.Size, Convert.FromHexString(digest.AsSpan(7)));
+    }
+
+    internal static async Task<string?> FetchReleaseNotesAsync(CancellationToken cancellationToken)
+    {
+        string number = CurrentVersion.ToString(3);
+        var release = await FetchReleaseAsync($"tags/{number}", cancellationToken)
+            ?? await FetchReleaseAsync($"tags/v{number}", cancellationToken);
+        return release is { Draft: false, Body: { } body } && !string.IsNullOrWhiteSpace(body) ? body : null;
+    }
+
+    private static async Task<GitHubRelease?> FetchReleaseAsync(string path, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repository}/releases/{path}");
+        request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        using var response = await Client.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<GitHubRelease>(cancellationToken);
     }
 
     private static string UpdateFolder => Path.Combine(Path.GetTempPath(), "CoreShift-Updates");

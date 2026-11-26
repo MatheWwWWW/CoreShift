@@ -37,12 +37,12 @@ public partial class MainWindow
                     detail += $" {state.Issue}";
             }
 
-            PagefileTweakState.Text = isElevated ? detail : $"{detail} Для изменения нужны права администратора.";
+            PagefileTweakState.Text = detail;
             uint initial = state.HasBackup ? state.File?.Initial ?? 0 : state.SuggestedInitial;
             uint maximum = state.HasBackup ? state.File?.Maximum ?? 0 : state.SuggestedMaximum;
             PagefileInitialValue.Text = initial == 0 ? "" : initial.ToString(CultureInfo.CurrentCulture);
             PagefileMaximumValue.Text = maximum == 0 ? "" : maximum.ToString(CultureInfo.CurrentCulture);
-            SetPagefileControls(isElevated && state.Issue is null && !state.HasBackup, isElevated && state.HasBackup);
+            SetPagefileControls(state.Issue is null && !state.HasBackup, state.HasBackup);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
@@ -62,7 +62,7 @@ public partial class MainWindow
 
     private async void ApplyPagefileClick(object sender, RoutedEventArgs e)
     {
-        if (workingWithPagefile || !isElevated || pagefileTweak is not { File: { } file } state)
+        if (workingWithPagefile || pagefileTweak is not { File: { } file } state)
             return;
 
         if (!uint.TryParse(PagefileInitialValue.Text.Trim(), NumberStyles.None, CultureInfo.CurrentCulture, out uint initial) ||
@@ -84,7 +84,7 @@ public partial class MainWindow
 
     private async Task ChangePagefileAsync(uint initial, uint maximum, bool restore, string? expectedPath)
     {
-        if (workingWithPagefile || !isElevated)
+        if (workingWithPagefile)
             return;
 
         workingWithPagefile = true;
