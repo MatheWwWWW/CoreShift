@@ -23,7 +23,7 @@ internal static class AppUpdater
     private const string Repository = "MatheWwWWW/CoreShift";
     private const string LatestReleasePath = "latest";
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{998EEA5D-ED30-49E3-A992-FF2AC2A9D7BB}_is1";
-    private const long MaxInstallerSize = 250 * 1024 * 1024;
+    private const long MaxInstallerSize = 2_000_000_000;
     private static readonly string[] WorkerLibraries =
         ["DirectWriteForwarder.dll", "System.Printing.dll", "ijwhost.dll", "vcruntime140_cor3.dll"];
     private static readonly HttpClient Client = new()
@@ -187,7 +187,7 @@ internal static class AppUpdater
         IProgress<int>? progress = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromMinutes(10));
+        timeout.CancelAfter(TimeSpan.FromMinutes(30));
         var token = timeout.Token;
 
         using var response = await Client.GetAsync(release.Installer, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);

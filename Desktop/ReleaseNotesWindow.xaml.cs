@@ -1,3 +1,4 @@
+using SmartResourceDispatcher.Core;
 using System.Diagnostics;
 using System.Windows;
 
@@ -10,7 +11,7 @@ public partial class ReleaseNotesWindow : Window
     internal ReleaseNotesWindow()
     {
         InitializeComponent();
-        VersionText.Text = $"Версия {AppUpdater.CurrentVersion.ToString(3)}";
+        VersionText.Text = UiText.Format($"Версия {AppUpdater.CurrentVersion.ToString(3)}");
         Loaded += OnLoaded;
     }
 
@@ -29,7 +30,7 @@ public partial class ReleaseNotesWindow : Window
 
             if (ReleaseText.Document.Blocks.Count == 0)
             {
-                Status.Text = "Для этой версии пока нет описания релиза.";
+                Status.Text = UiText.Get("Для этой версии пока нет описания релиза.");
                 return;
             }
 
@@ -42,7 +43,7 @@ public partial class ReleaseNotesWindow : Window
                 return;
 
             Debug.WriteLine(ex);
-            Status.Text = "Не удалось загрузить описание релиза с GitHub. Попробуйте открыть окно ещё раз.";
+            Status.Text = UiText.Get("Не удалось загрузить описание релиза с GitHub. Попробуйте открыть окно ещё раз.");
         }
     }
 

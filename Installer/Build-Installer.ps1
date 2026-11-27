@@ -4,7 +4,8 @@ param(
     [string] $InnoCompiler,
     [ValidatePattern('^[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}$')]
     [string] $Version,
-    [string[]] $PackageSource
+    [string[]] $PackageSource,
+    [switch] $WithoutShifter
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,7 +60,13 @@ try {
         throw ".NET publish exited with code $LASTEXITCODE."
     }
 
-    & $innoExe '/Qp' "/O$workDir" "/DAppVersion=$Version" "/DPublishDir=$publishDir" (Join-Path $PSScriptRoot 'CoreShift.iss')
+    $innoArgs = @('/Qp', "/O$workDir", "/DAppVersion=$Version", "/DPublishDir=$publishDir")
+    if (-not $WithoutShifter) {
+        $shifterDir = Join-Path $workDir 'shifter'
+        & (Join-Path $PSScriptRoot 'Prepare-Shifter.ps1') -Destination $shifterDir
+        $innoArgs += "/DShifterDir=$shifterDir"
+    }
+    & $innoExe @innoArgs (Join-Path $PSScriptRoot 'CoreShift.iss')
     if ($LASTEXITCODE -ne 0) {
         throw "Inno Setup exited with code $LASTEXITCODE."
     }

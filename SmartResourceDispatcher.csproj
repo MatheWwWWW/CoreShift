@@ -11,6 +11,7 @@
     <PackageReference Include="System.Management" Version="11.0.0" />
     <Compile Remove="Tests/**/*.cs" />
     <Compile Remove="Desktop/**/*.cs" />
+    <EmbeddedResource Include="Core/English.json" LogicalName="CoreShift.English.json" />
     <InternalsVisibleTo Include="SmartResourceDispatcher.Checks" />
     <InternalsVisibleTo Include="CoreShift.Desktop" />
   </ItemGroup>

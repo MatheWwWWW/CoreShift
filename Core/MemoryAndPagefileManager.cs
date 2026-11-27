@@ -11,7 +11,7 @@ internal sealed record MemoryCommit(ulong CurrentBytes, ulong PeakBytes, ulong L
     public ulong AvailableBytes => LimitBytes - Math.Min(CurrentBytes, LimitBytes);
 }
 internal sealed record PhysicalMemory(ulong TotalBytes, ulong AvailableBytes);
-internal sealed record MemorySnapshot(PhysicalMemory Physical, MemoryCommit Commit);
+internal sealed record MemorySnapshot(PhysicalMemory Physical, MemoryCommit Commit, ulong SystemCacheBytes = 0);
 internal sealed record CrashDumpSettings(int? Mode, bool HasDedicatedFile);
 
 internal static class MemoryAndPagefileManager
@@ -42,7 +42,7 @@ internal static class MemoryAndPagefileManager
         {
             using (result)
             {
-                files.Add(new PagefileUsage(result["Name"] as string ?? "неизвестно",
+                files.Add(new PagefileUsage(result["Name"] as string ?? UiText.Get("неизвестно"),
                     result["AllocatedBaseSize"] as uint?, result["CurrentUsage"] as uint?,
                     result["PeakUsage"] as uint?));
             }
@@ -79,7 +79,7 @@ internal static class MemoryAndPagefileManager
         var info = ReadPerformanceInformation();
         return new MemorySnapshot(new PhysicalMemory((ulong)info.PhysicalTotal * info.PageSize, (ulong)info.PhysicalAvailable * info.PageSize),
             new MemoryCommit((ulong)info.CommitTotal * info.PageSize, (ulong)info.CommitPeak * info.PageSize,
-                (ulong)info.CommitLimit * info.PageSize));
+                (ulong)info.CommitLimit * info.PageSize), (ulong)info.SystemCache * info.PageSize);
     }
 
     internal static bool? ReadAutomaticPagefileManagement()
@@ -123,25 +123,25 @@ internal static class MemoryAndPagefileManager
         {
             ulong workloadBytes = commit.PeakBytes > ramBytes.Value ? commit.PeakBytes - ramBytes.Value : 0;
             notes.Add(workloadBytes == 0
-                ? "Пик выделенной памяти с последней загрузки укладывался в объём ОЗУ."
-                : $"Пик выделенной памяти с последней загрузки превысил объём ОЗУ на {(workloadBytes + mib - 1) / mib} МБ. Разница помогает оценить размер подкачки без запаса на рост нагрузки.");
+                ? UiText.Get("Пик выделенной памяти с последней загрузки укладывался в объём ОЗУ.")
+                : UiText.Format($"Пик выделенной памяти с последней загрузки превысил объём ОЗУ на {(workloadBytes + mib - 1) / mib} МБ. Разница помогает оценить размер подкачки без запаса на рост нагрузки."));
         }
         else
         {
-            notes.Add("Для расчёта вручную нужны объём ОЗУ и пиковая выделенная память под типичной нагрузкой.");
+            notes.Add(UiText.Get("Для расчёта вручную нужны объём ОЗУ и пиковая выделенная память под типичной нагрузкой."));
         }
 
         if (dump is { HasDedicatedFile: true })
-            notes.Add("Для дампов указан отдельный файл. Проверьте его доступность и размер.");
+            notes.Add(UiText.Get("Для дампов указан отдельный файл. Проверьте его доступность и размер."));
         else
             notes.Add(dump?.Mode switch
             {
-                0 => "Системные дампы отключены.",
-                1 when ramBytes is > 0 => $"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} МБ.",
-                1 => "Для полного дампа нужен объём ОЗУ плюс 257 МБ.",
-                3 => "Для малого дампа нужен минимум 1 МБ.",
-                2 or 7 or 10 => "Точный минимум для выбранного системного дампа зависит от его объёма.",
-                _ => "Режим системных дампов неизвестен. Проверьте его перед ручной настройкой."
+                0 => UiText.Get("Системные дампы отключены."),
+                1 when ramBytes is > 0 => UiText.Format($"Для полного дампа требуется не менее {(ramBytes.Value + mib - 1) / mib + 257} МБ."),
+                1 => UiText.Get("Для полного дампа нужен объём ОЗУ плюс 257 МБ."),
+                3 => UiText.Get("Для малого дампа нужен минимум 1 МБ."),
+                2 or 7 or 10 => UiText.Get("Точный минимум для выбранного системного дампа зависит от его объёма."),
+                _ => UiText.Get("Режим системных дампов неизвестен. Проверьте его перед ручной настройкой.")
             });
 
         return string.Join(Environment.NewLine, notes);

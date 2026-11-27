@@ -27,12 +27,12 @@ public partial class MainWindow
         {
             pagefileTweak = await RunInBackground(PagefileIncrease.Read);
             var state = pagefileTweak;
-            string detail = state.Issue ?? "Параметры файла подкачки недоступны.";
+            string detail = state.Issue ?? UiText.Get("Параметры файла подкачки недоступны.");
             if (state.File is { } file)
             {
-                string sizes = file.Automatic ? "размер управляется Windows"
-                    : file.Initial == 0 ? "планируется новый файл" : $"задано {file.Initial:N0}–{file.Maximum:N0} МиБ";
-                detail = $"{file.Path} · {sizes} · выделено {file.Allocated:N0} МиБ · свободно {DiskCleaner.FormatBytes((long)state.FreeBytes)}.";
+                string sizes = file.Automatic ? UiText.Get("размер управляется Windows")
+                    : file.Initial == 0 ? UiText.Get("планируется новый файл") : UiText.Format($"задано {file.Initial:N0}–{file.Maximum:N0} МБ");
+                detail = UiText.Format($"{file.Path} · {sizes} · выделено {file.Allocated:N0} МБ · свободно {DiskCleaner.FormatBytes((long)state.FreeBytes)}.");
                 if (state.Issue is not null && !state.HasBackup)
                     detail += $" {state.Issue}";
             }
@@ -47,7 +47,7 @@ public partial class MainWindow
         catch (Exception ex) when (IsSystemError(ex))
         {
             pagefileTweak = null;
-            PagefileTweakState.Text = $"Не удалось прочитать параметры файла подкачки. {ex.Message}";
+            PagefileTweakState.Text = UiText.Format($"Не удалось прочитать параметры файла подкачки. {ex.Message}");
             SetPagefileControls(false, false);
         }
     }
@@ -70,12 +70,12 @@ public partial class MainWindow
             !state.Accepts(initial, maximum))
         {
             PagefileTweakStatus.Visibility = Visibility.Visible;
-            SetStatus(PagefileTweakStatus, $"Начальный размер должен быть в пределах {state.Minimum:N0}–{state.Capacity:N0} МиБ. Максимум берётся не ниже начального размера и ранее заданного максимума ({file.Maximum:N0} МиБ), верхняя граница — {state.AllowedMaximum:N0} МиБ.", error: true);
+            SetStatus(PagefileTweakStatus, UiText.Format($"Начальный размер должен быть в пределах {state.Minimum:N0}–{state.Capacity:N0} МБ. Максимум берётся не ниже начального размера и ранее заданного максимума ({file.Maximum:N0} МБ), верхняя граница — {state.AllowedMaximum:N0} МБ."), error: true);
             return;
         }
 
-        if (Confirm("Увеличение файла подкачки", $"Для {file.Path} будет задан размер от {initial:N0} до {maximum:N0} МиБ. " +
-                "Убедитесь, что на диске останется место для приложений и обновлений. Изменения вступят в силу после перезагрузки Windows.", "Применить"))
+        if (Confirm(UiText.Get("Увеличение файла подкачки"), UiText.Format($"Для {file.Path} будет задан размер от {initial:N0} до {maximum:N0} МБ. ") +
+                UiText.Get("Убедитесь, что на диске останется место для приложений и обновлений. Изменения вступят в силу после перезагрузки Windows."), UiText.Get("Применить")))
             await ChangePagefileAsync(initial, maximum, restore: false, file.Path);
     }
 
@@ -90,15 +90,15 @@ public partial class MainWindow
         workingWithPagefile = true;
         SetPagefileControls(false, false);
         PagefileTweakStatus.Visibility = Visibility.Visible;
-        SetStatus(PagefileTweakStatus, "Обновляем параметры файла подкачки…");
+        SetStatus(PagefileTweakStatus, UiText.Get("Обновляем параметры файла подкачки…"));
         try
         {
             bool changed = await RunInBackground(() => PagefileIncrease.Change(initial, maximum, restore, expectedPath));
             SetStatus(PagefileTweakStatus, (restore, changed) switch
             {
-                (false, true) => "Новый размер сохранён. Перезагрузите Windows.",
-                (true, true) => "Исходные параметры восстановлены. Перезагрузите Windows.",
-                _ => "Сохранённая настройка отсутствует."
+                (false, true) => UiText.Get("Новый размер сохранён. Перезагрузите Windows."),
+                (true, true) => UiText.Get("Исходные параметры восстановлены. Перезагрузите Windows."),
+                _ => UiText.Get("Сохранённая настройка отсутствует.")
             });
         }
         catch (Exception ex) when (IsSystemError(ex))
@@ -129,13 +129,13 @@ public partial class MainWindow
         try
         {
             var (optimized, hasBackup) = await RunInBackground(WindowEffects.Read);
-            WindowEffectsState.Text = optimized ? "Перечисленные эффекты отключены."
-                : hasBackup ? "Часть эффектов включена. Исходные значения сохранены." : "Некоторые визуальные эффекты включены.";
+            WindowEffectsState.Text = optimized ? UiText.Get("Перечисленные эффекты отключены.")
+                : hasBackup ? UiText.Get("Часть эффектов включена. Исходные значения сохранены.") : UiText.Get("Некоторые визуальные эффекты включены.");
             SetWindowEffectsControls(!optimized && !hasBackup, hasBackup);
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            WindowEffectsState.Text = $"Не удалось прочитать визуальные настройки. {ex.Message}";
+            WindowEffectsState.Text = UiText.Format($"Не удалось прочитать визуальные настройки. {ex.Message}");
             SetWindowEffectsControls(false, false);
         }
     }
@@ -158,16 +158,16 @@ public partial class MainWindow
         workingWithWindowEffects = true;
         SetWindowEffectsControls(false, false);
         WindowEffectsStatus.Visibility = Visibility.Visible;
-        SetStatus(WindowEffectsStatus, "Обновляем визуальные настройки…");
+        SetStatus(WindowEffectsStatus, UiText.Get("Обновляем визуальные настройки…"));
         try
         {
             bool changed = await RunInBackground(() => WindowEffects.Change(restore));
             SetStatus(WindowEffectsStatus, (restore, changed) switch
             {
-                (false, true) => "Визуальные эффекты отключены.",
-                (true, true) => "Исходные визуальные параметры восстановлены.",
-                (true, false) => "Сохранённые настройки отсутствуют.",
-                _ => "Эффекты уже отключены."
+                (false, true) => UiText.Get("Визуальные эффекты отключены."),
+                (true, true) => UiText.Get("Исходные визуальные параметры восстановлены."),
+                (true, false) => UiText.Get("Сохранённые настройки отсутствуют."),
+                _ => UiText.Get("Эффекты уже отключены.")
             });
         }
         catch (Exception ex) when (IsSystemError(ex))

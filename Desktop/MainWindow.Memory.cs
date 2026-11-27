@@ -17,7 +17,7 @@ public partial class MainWindow
     private sealed record ProcessMemory(ProcessMemoryKey Key, string Name, long Bytes, bool CanTrim);
     private sealed record ProcessMemorySample(DateTimeOffset At, Dictionary<ProcessMemoryKey, ProcessMemory> Processes);
     private sealed record MemoryPoint(DateTimeOffset At, MemorySnapshot Snapshot);
-    private sealed record MemoryRead(MemoryPoint? System, ProcessMemorySample? Processes, bool TargetExited);
+    private sealed record MemoryRead(MemoryPoint? System, ProcessMemorySample? Processes);
     private sealed record MemoryPagefileRow(string Name, uint? CurrentMiB, uint? AllocatedMiB, uint? PeakMiB, ulong? FreeBytes)
     {
         public string Allocation => $"{FormatMiB(CurrentMiB)} / {FormatMiB(AllocatedMiB)}";
@@ -56,10 +56,9 @@ public partial class MainWindow
         }
     }
 
-    private sealed class MemorySession(string name, ProcessMemoryKey target)
+    private sealed class MemorySession(string name)
     {
         public string Name { get; } = name;
-        public ProcessMemoryKey Target { get; } = target;
         public DateTimeOffset Started { get; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? Ended { get; set; }
         public MemoryPoint? Minimum { get; set; }
@@ -82,6 +81,7 @@ public partial class MainWindow
     private bool readingMemory;
     private bool readingPagefiles;
     private bool trimmingProcess;
+    private readonly Dictionary<ProcessMemoryKey, ProcessMemory> memoryTrimQueue = [];
 
     private bool MemoryDiagnosticsVisible => MemoryPage.IsVisible && WindowState != WindowState.Minimized;
 
@@ -126,7 +126,7 @@ public partial class MainWindow
         var activeSession = memorySession is { Ended: null } ? memorySession : null;
         try
         {
-            var read = await RunInBackground(() => ReadMemoryDiagnostics(activeSession?.Target));
+            var read = await RunInBackground(ReadMemoryDiagnostics);
             if (closing)
                 return;
 
@@ -139,12 +139,7 @@ public partial class MainWindow
                 AddProcessMemorySample(processes);
 
             if (activeSession is { Ended: null } && ReferenceEquals(activeSession, memorySession))
-            {
-                if (read.TargetExited)
-                    FinishMemorySession();
-                else
-                    UpdateMemorySession(activeSession, read);
-            }
+                UpdateMemorySession(activeSession, read);
 
             if (!MemoryDiagnosticsVisible)
                 return;
@@ -153,7 +148,7 @@ public partial class MainWindow
             if (read.Processes is { } current)
                 RenderMemoryProcesses(current);
             else
-                SetStatus(MemoryProcessStatus, "Не удалось прочитать список процессов. Повторим через несколько секунд.", error: true);
+                SetStatus(MemoryProcessStatus, UiText.Get("Не удалось прочитать список процессов. Повторим через несколько секунд."), error: true);
         }
         finally
         {
@@ -161,7 +156,7 @@ public partial class MainWindow
         }
     }
 
-    private static MemoryRead ReadMemoryDiagnostics(ProcessMemoryKey? target)
+    private static MemoryRead ReadMemoryDiagnostics()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         MemoryPoint? system = null;
@@ -170,8 +165,7 @@ public partial class MainWindow
         catch (Exception ex) when (IsSystemError(ex)) { Debug.WriteLine(ex); }
         try { processes = new ProcessMemorySample(now, ReadProcessMemory()); }
         catch (Exception ex) when (IsSystemError(ex)) { Debug.WriteLine(ex); }
-        bool targetExited = target is { } key && processes?.Processes.ContainsKey(key) != true && HasMemoryTargetExited(key);
-        return new MemoryRead(system, processes, targetExited);
+        return new MemoryRead(system, processes);
     }
 
     private static Dictionary<ProcessMemoryKey, ProcessMemory> ReadProcessMemory()
@@ -202,38 +196,21 @@ public partial class MainWindow
         return samples;
     }
 
-    private static bool HasMemoryTargetExited(ProcessMemoryKey target)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(target.Pid);
-            return process.HasExited || process.StartTime.ToUniversalTime() != target.StartedUtc;
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        {
-            return true;
-        }
-        catch (Win32Exception ex)
-        {
-            Debug.WriteLine(ex);
-            return false;
-        }
-    }
-
     private void RenderMemoryReading(MemoryPoint? point, DateTimeOffset now)
     {
         var snapshot = point?.Snapshot;
-        DiagnosticRam.Text = snapshot is null ? "—" : $"{FormatBytes(snapshot.Physical.AvailableBytes)} из {FormatBytes(snapshot.Physical.TotalBytes)}";
-        DiagnosticCommit.Text = snapshot is null ? "—" : $"{FormatBytes(snapshot.Commit.CurrentBytes)} из {FormatBytes(snapshot.Commit.LimitBytes)}";
+        DiagnosticRam.Text = snapshot is null ? "—" : UiText.Format($"{FormatBytes(snapshot.Physical.AvailableBytes)} из {FormatBytes(snapshot.Physical.TotalBytes)}");
+        DiagnosticCommit.Text = snapshot is null ? "—" : UiText.Format($"{FormatBytes(snapshot.Commit.CurrentBytes)} из {FormatBytes(snapshot.Commit.LimitBytes)}");
         DiagnosticHeadroom.Text = FormatBytes(snapshot?.Commit.AvailableBytes);
+        DiagnosticSystemCache.Text = FormatBytes(snapshot?.SystemCacheBytes);
         DrawMemoryHistory(now);
         MemoryHistoryStatus.Visibility = VisibleWhen(point is null || memoryHistory.Count < 2);
-        MemoryHistoryStatus.Text = point is null ? "Показатели Windows сейчас недоступны." : "Собираем первые замеры…";
+        MemoryHistoryStatus.Text = point is null ? UiText.Get("Показатели Windows сейчас недоступны.") : UiText.Get("Собираем первые замеры…");
 
         int nearLimit = memoryHistory.Reverse().TakeWhile(sample => now - sample.At <= TimeSpan.FromSeconds(30))
             .Count(sample => sample.Snapshot.Commit is { LimitBytes: > 0 } commit && commit.CurrentBytes / (double)commit.LimitBytes >= .90);
         SetStatus(MemoryPressureStatus, nearLimit >= 8
-            ? "Выделенная память близка к лимиту в большинстве замеров за последние 30 секунд. Проверьте режим подкачки и свободное место на диске."
+            ? UiText.Get("Выделенная память близка к лимиту в большинстве замеров за последние 30 секунд. Проверьте режим подкачки и свободное место на диске.")
             : "", error: nearLimit >= 8);
         MemoryPressureStatus.Visibility = VisibleWhen(nearLimit >= 8);
         MemoryAdvice.Text = MemoryAndPagefileManager.ExplainManualSizing(snapshot?.Physical.TotalBytes, snapshot?.Commit, pagefileDiagnostics?.Dump);
@@ -322,10 +299,19 @@ public partial class MainWindow
             row.Update(process, growth);
         }
 
-        SetStatus(MemoryProcessStatus, memoryRows.Count == 0 ? "Windows не вернула доступных процессов." :
-            baseline is null ? $"Доступно процессов: {memoryRows.Count}. Прирост появится после двух минут наблюдения." :
-            $"Доступно процессов: {memoryRows.Count}. Рабочий набор может включать общую память.");
+        SetStatus(MemoryProcessStatus, memoryRows.Count == 0 ? UiText.Get("Windows не вернула доступных процессов.") :
+            baseline is null ? UiText.Format($"Доступно процессов: {memoryRows.Count}. Прирост появится после двух минут наблюдения.") :
+            UiText.Format($"Доступно процессов: {memoryRows.Count}. Рабочий набор может включать общую память."));
         UpdateMemoryProcessFilterState();
+    }
+
+    private void OpenProcessSearch(string name)
+    {
+        MemoryNav.IsChecked = true;
+        MemoryProcessSearch.Text = name;
+        BringControlIntoView(MemoryProcessSearch);
+        if (!webReady)
+            MemoryProcessSearch.Focus();
     }
 
     private bool FilterMemoryProcess(object item)
@@ -379,12 +365,17 @@ public partial class MainWindow
         var process = MemoryProcesses.SelectedItem as ProcessMemoryRow;
         bool canTrim = process is { Data.CanTrim: true };
         TrimButton.IsEnabled = canTrim && !trimmingProcess;
+        QueueMemoryProcessButton.IsEnabled = process is { Data.CanTrim: true } && !trimmingProcess &&
+            memoryTrimQueue.Count < 8 && !memoryTrimQueue.ContainsKey(process.Data.Key);
+        RunMemoryTrimQueueButton.IsEnabled = ClearMemoryTrimQueueButton.IsEnabled = !trimmingProcess && memoryTrimQueue.Count > 0;
+        MemoryTrimQueueText.Text = memoryTrimQueue.Count > 0
+            ? string.Join(" · ", memoryTrimQueue.Values.Select(item => $"{item.Name} (PID {item.Key.Pid})")) : UiText.Get("Очередь пуста");
         MemoryProcessSelection.Text = process is null
-            ? "Выберите процесс в таблице" : $"{process.Name}  ·  PID {process.Pid}";
+            ? UiText.Get("Выберите процесс в таблице") : $"{process.Name}  ·  PID {process.Pid}";
         MemoryProcessActionHint.Visibility = VisibleWhen(process is not null);
         MemoryProcessActionHint.Text = canTrim
-            ? "При необходимости Windows снова загрузит страницы в рабочий набор."
-            : "Сброс рабочего набора для этого процесса недоступен.";
+            ? UiText.Get("При необходимости Windows снова загрузит страницы в рабочий набор.")
+            : UiText.Get("Сброс рабочего набора для этого процесса недоступен.");
     }
 
     private async void TrimClick(object sender, RoutedEventArgs e)
@@ -395,23 +386,62 @@ public partial class MainWindow
         var process = selected.Data;
         trimmingProcess = true;
         UpdateMemoryProcessAction();
-        SetStatus(TrimStatus, $"Сбрасываем рабочий набор {process.Name} (PID {process.Key.Pid})…");
+        SetStatus(TrimStatus, UiText.Format($"Сбрасываем рабочий набор {process.Name} (PID {process.Key.Pid})…"));
         try
         {
             var (before, after) = await RunInBackground(() => MemoryOptimizer.TrimWorkingSet(process.Key.Pid, process.Key.StartedUtc));
             SetStatus(TrimStatus, before.HasValue && after.HasValue
-                ? $"{process.Name} (PID {process.Key.Pid}) · Рабочий набор: {FormatBytes(before)} → {FormatBytes(after)}."
-                : $"Рабочий набор {process.Name} (PID {process.Key.Pid}) сброшен. Замер до или после операции недоступен.");
+                ? UiText.Format($"{process.Name} (PID {process.Key.Pid}) · Рабочий набор: {FormatBytes(before)} → {FormatBytes(after)}.")
+                : UiText.Format($"Рабочий набор {process.Name} (PID {process.Key.Pid}) сброшен. Замер до или после операции недоступен."));
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            SetStatus(TrimStatus, $"Не удалось сбросить рабочий набор {process.Name}: {ex.Message}", error: true);
+            SetStatus(TrimStatus, UiText.Format($"Не удалось сбросить рабочий набор {process.Name}: {ex.Message}"), error: true);
         }
         finally
         {
             trimmingProcess = false;
             UpdateMemoryProcessAction();
         }
+    }
+
+    private void QueueMemoryProcessClick(object sender, RoutedEventArgs e)
+    {
+        if (!trimmingProcess && memoryTrimQueue.Count < 8 && MemoryProcesses.SelectedItem is ProcessMemoryRow { Data.CanTrim: true } row)
+            memoryTrimQueue.TryAdd(row.Data.Key, row.Data);
+        UpdateMemoryProcessAction();
+    }
+
+    private void ClearMemoryQueueClick(object sender, RoutedEventArgs e)
+    {
+        if (trimmingProcess) return;
+        memoryTrimQueue.Clear();
+        UpdateMemoryProcessAction();
+    }
+
+    private async void TrimMemoryQueueClick(object sender, RoutedEventArgs e)
+    {
+        if (trimmingProcess || closing || memoryTrimQueue.Count == 0 || !Confirm(UiText.Get("Сброс ОЗУ для выбранных процессов"),
+            MemoryTrimQueueText.Text + "\n\n" + UiText.Get("Windows может снова загрузить освобождённые страницы."), UiText.Get("Сбросить очередь")))
+            return;
+        var targets = memoryTrimQueue.Values.ToArray();
+        trimmingProcess = true;
+        UpdateMemoryProcessAction();
+        try
+        {
+            var measurements = await TrackOperation(RunInBackground(() => targets.Select(process =>
+            {
+                try
+                {
+                    var (before, after) = MemoryOptimizer.TrimWorkingSet(process.Key.Pid, process.Key.StartedUtc);
+                    return $"{process.Name} ({process.Key.Pid}) · {FormatBytes(before)} → {FormatBytes(after)}";
+                }
+                catch (Exception ex) when (IsSystemError(ex)) { return $"{process.Name} ({process.Key.Pid}) · {ex.Message}"; }
+            }).ToArray()));
+            SetStatus(MemoryTrimQueueStatus, string.Join(Environment.NewLine, measurements));
+            memoryTrimQueue.Clear();
+        }
+        finally { trimmingProcess = false; if (!closing) UpdateMemoryProcessAction(); }
     }
 
     private async Task RefreshPagefileDiagnosticsAsync()
@@ -429,14 +459,14 @@ public partial class MainWindow
             pagefileDiagnostics = result;
             PagefileMode.Text = result.Automatic switch
             {
-                true => "Режим: Windows управляет размером автоматически.",
-                false => "Режим: управление настроено отдельно для каждого диска.",
-                null => "Режим управления недоступен."
+                true => UiText.Get("Режим: Windows управляет размером автоматически."),
+                false => UiText.Get("Режим: управление настроено отдельно для каждого диска."),
+                null => UiText.Get("Режим управления недоступен.")
             };
             DiagnosticPagefileStatus.Text = result.Files switch
             {
-                null => "Данные об использовании подкачки недоступны.",
-                { Length: 0 } => "Активных файлов подкачки нет.",
+                null => UiText.Get("Данные об использовании подкачки недоступны."),
+                { Length: 0 } => UiText.Get("Активных файлов подкачки нет."),
                 _ => ""
             };
             DiagnosticPagefileStatus.Visibility = VisibleWhen(result.Files is null or { Length: 0 });
@@ -485,12 +515,12 @@ public partial class MainWindow
         OpenWindowsTool(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "SystemPropertiesAdvanced.exe"))
             { UseShellExecute = true }, PagefileSettingsStatus);
 
-    private void StartMemorySession(string name, ProcessMemoryKey process)
+    private void StartMemorySession(string name)
     {
         if (memorySession is { Ended: null })
             return;
 
-        memorySession = new MemorySession(name, process);
+        memorySession = new MemorySession(name);
         RenderMemorySession();
         UpdateMemoryPolling();
     }
@@ -523,7 +553,7 @@ public partial class MainWindow
                 .Where(item => item.Growth > 0)
                 .OrderByDescending(item => item.Growth)
                 .Take(3)
-                .Select(item => $"{item.Process.Name} (PID {item.Process.Key.Pid})  ·  {FormatGrowth(item.Growth)} ОЗУ")
+                .Select(item => UiText.Format($"{item.Process.Name} (PID {item.Process.Key.Pid})  ·  {FormatGrowth(item.Growth)} ОЗУ"))
                 .ToArray();
         }
 
@@ -534,13 +564,13 @@ public partial class MainWindow
     {
         var session = memorySession;
         MemorySessionStatus.Text = session is null
-            ? "Запустите профиль и переключитесь на выбранное приложение, чтобы начать замеры."
-            : $"{session.Name}.exe  ·  {session.Started.ToLocalTime():HH:mm:ss}" +
-              (session.Ended is { } end ? $"–{end.ToLocalTime():HH:mm:ss}" : "  ·  Идёт запись");
+            ? UiText.Get("Запустите профиль и переключитесь на выбранное приложение, чтобы начать замеры.")
+            : $"{session.Name}  ·  {session.Started.ToLocalTime():HH:mm:ss}" +
+              (session.Ended is { } end ? $"–{end.ToLocalTime():HH:mm:ss}" : UiText.Get("  ·  Идёт запись"));
         MemorySessionPeak.Text = session?.Minimum is { } sample
-            ? $"Минимальный запас: {FormatBytes(sample.Snapshot.Commit.AvailableBytes)} в {sample.At.ToLocalTime():HH:mm:ss}." +
-              (session.Growth.Length > 0 ? " На тот момент больше всего выросли с начала сеанса:" : "")
-            : session is null ? "" : session.Ended.HasValue ? "За сеанс не успели получить замеры." : "Собираем первые замеры…";
+            ? UiText.Format($"Минимальный запас: {FormatBytes(sample.Snapshot.Commit.AvailableBytes)} в {sample.At.ToLocalTime():HH:mm:ss}.") +
+              (session.Growth.Length > 0 ? UiText.Get(" На тот момент больше всего выросли с начала сеанса:") : "")
+            : session is null ? "" : session.Ended.HasValue ? UiText.Get("За сеанс не успели получить замеры.") : UiText.Get("Собираем первые замеры…");
         MemorySessionPeak.Visibility = VisibleWhen(session is not null);
         MemorySessionProcesses.ItemsSource = session?.Growth;
     }

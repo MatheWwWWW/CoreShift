@@ -76,11 +76,11 @@ internal sealed class GamePowerProfile : IDisposable
                 return;
             Check(PowerSetActiveScheme(0, in HighPerformance));
             originalPlan = current;
-            report("Включён план питания «Высокая производительность».");
+            report(UiText.Get("Включён план питания «Высокая производительность»."));
         }
         catch (Win32Exception ex)
         {
-            report($"Не удалось переключить план питания: {ex.Message}");
+            report(UiText.Format($"Не удалось переключить план питания: {ex.Message}"));
         }
     }
 
@@ -94,11 +94,11 @@ internal sealed class GamePowerProfile : IDisposable
             if (ReadActivePlan() == HighPerformance)
             {
                 Check(PowerSetActiveScheme(0, in original));
-                report("Восстановлен исходный план питания.");
+                report(UiText.Get("Восстановлен исходный план питания."));
             }
             else
             {
-                report("План питания изменён в Windows. Сохранён текущий план.");
+                report(UiText.Get("План питания изменён в Windows. Сохранён текущий план."));
             }
 
             originalPlan = null;
@@ -108,7 +108,7 @@ internal sealed class GamePowerProfile : IDisposable
         catch (Win32Exception ex)
         {
             if (!reportedRestoreFailure)
-                report($"Не удалось восстановить план питания: {ex.Message}");
+                report(UiText.Format($"Не удалось восстановить план питания: {ex.Message}"));
             reportedRestoreFailure = true;
             return false;
         }

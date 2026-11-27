@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management;
+using SmartResourceDispatcher.Core;
 
 namespace CoreShift.Desktop;
 
@@ -15,6 +16,32 @@ public partial class MainWindow
     private sealed record StorageVolume(string? Letter, string? Path, string? Name, string? FileSystem, ulong? Size, ulong? Free);
 
     private sealed record StorageReport(string Summary, string? WindowsVolume, IReadOnlyList<PcInfoRow> Rows);
+    private sealed record BoardDrive(uint Number, string Name, string Capacity, string Volumes, bool System);
+
+    private static BoardDrive[] ReadBoardDrives()
+    {
+        var disks = ReadWmi("SELECT Number, FriendlyName, Size, IsBoot FROM MSFT_Disk", item => new StorageDisk(
+            AsUInt(item["Number"]) ?? uint.MaxValue, WmiText(item, "FriendlyName") ?? Unavailable,
+            PositiveBytes(item["Size"]), null, item["IsBoot"] is true, null, null, null), StorageScope);
+        var partitions = ReadWmi("SELECT DiskNumber, PartitionNumber, DriveLetter FROM MSFT_Partition", item => new StoragePartition(
+            AsUInt(item["DiskNumber"]) ?? uint.MaxValue, AsUInt(item["PartitionNumber"]) ?? 0,
+            ReadDriveLetter(item["DriveLetter"]), null, []), StorageScope);
+        if (disks.Count == 0)
+        {
+            disks = ReadWmi("SELECT Index, Model, Size FROM Win32_DiskDrive", item => new StorageDisk(
+                AsUInt(item["Index"]) ?? uint.MaxValue, WmiText(item, "Model") ?? Unavailable,
+                PositiveBytes(item["Size"]), null, false, null, null, null));
+            partitions = ReadLegacyPartitions();
+        }
+        string? windows = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\');
+        var mapped = partitions.ToLookup(partition => partition.Disk);
+        return disks.Where(disk => disk.Number != uint.MaxValue).Select(disk =>
+        {
+            var letters = mapped[disk.Number].Select(partition => partition.Letter).OfType<string>().Distinct().ToArray();
+            return new BoardDrive(disk.Number, disk.Name, FormatBytes(disk.Size), string.Join(" · ", letters),
+                disk.IsBoot || letters.Any(letter => SameStorageId(letter, windows)));
+        }).OrderByDescending(disk => disk.System).ThenBy(disk => disk.Number).ToArray();
+    }
 
     private static StorageReport ReadStorageInfo()
     {
@@ -72,7 +99,7 @@ public partial class MainWindow
             string? busLabel = FormatStorageBus(bus);
             if (busLabel is not null && disk.Name.Contains($" {busLabel} ", StringComparison.OrdinalIgnoreCase))
                 busLabel = null;
-            rows.Add(new($"Диск {disk.Number}", JoinDetails(disk.Name, mediaType, busLabel,
+            rows.Add(new(UiText.Format($"Диск {disk.Number}"), JoinDetails(disk.Name, mediaType, busLabel,
                 disk.Size is { } size ? FormatBytes(size) : null,
                 system ? windowsVolume is not null ? $"Windows ({windowsVolume})" : "Windows" : null)!, IsGroup: true));
 
@@ -80,11 +107,11 @@ public partial class MainWindow
                 .ThenBy(partition => partition.Number))
             {
                 var volume = volumes.FirstOrDefault(candidate => IsPartitionVolume(partition, candidate));
-                string label = partition.Letter ?? volume?.Letter ?? partition.Kind ?? $"Раздел {partition.Number}";
+                string label = partition.Letter ?? volume?.Letter ?? partition.Kind ?? UiText.Format($"Раздел {partition.Number}");
                 var capacity = volume?.Size ?? partition.Size;
                 rows.Add(new(label, JoinDetails(volume?.Name, volume?.FileSystem,
                     capacity is { } total ? FormatBytes(total) : null,
-                    volume?.Free is { } free ? $"Свободно {FormatBytes(free)}" : null) ?? Unavailable));
+                    volume?.Free is { } free ? UiText.Format($"Свободно {FormatBytes(free)}") : null) ?? Unavailable));
             }
 
             string? reliability = ReadStorageReliability(disk.Path, "MSFT_DiskToStorageReliabilityCounter")
@@ -92,7 +119,7 @@ public partial class MainWindow
             if (reliability is not null)
             {
                 anyTelemetry = true;
-                rows.Add(new($"Датчики диска {disk.Number}", reliability));
+                rows.Add(new(UiText.Format($"Датчики диска {disk.Number}"), reliability));
             }
         }
 
@@ -101,14 +128,14 @@ public partial class MainWindow
         {
             rows.Add(new(volume.Letter!, JoinDetails(volume.Name, volume.FileSystem,
                 volume.Size is { } total ? FormatBytes(total) : null,
-                volume.Free is { } free ? $"Свободно {FormatBytes(free)}" : null) ?? Unavailable));
+                volume.Free is { } free ? UiText.Format($"Свободно {FormatBytes(free)}") : null) ?? Unavailable));
         }
 
         if (disks.Count > 0 && !anyTelemetry)
-            rows.Add(new("Температура, износ, наработка", "Windows не вернула данные"));
+            rows.Add(new(UiText.Get("Температура, износ, наработка"), UiText.Get("Windows не вернула данные")));
 
-        string? windowsDetail = windowsVolume is not null ? JoinDetails($"Windows на {windowsVolume}", windowsDisk?.Name) : null;
-        return new StorageReport(disks.Count > 0 ? $"Дисков: {disks.Count}" : Unavailable, windowsDetail, AvailableRows(rows));
+        string? windowsDetail = windowsVolume is not null ? JoinDetails(UiText.Format($"Windows на {windowsVolume}"), windowsDisk?.Name) : null;
+        return new StorageReport(disks.Count > 0 ? UiText.Format($"Дисков: {disks.Count}") : Unavailable, windowsDetail, AvailableRows(rows));
     }
 
     private static List<StoragePartition> ReadLegacyPartitions()
@@ -166,8 +193,8 @@ public partial class MainWindow
         return ReadWmi($"ASSOCIATORS OF {{{path}}} WHERE AssocClass = {association} ResultClass = MSFT_StorageReliabilityCounter",
             item => JoinDetails(
                 AsUInt(item["Temperature"]) is > 0 and < 255 and var temperature ? $"{temperature} °C" : null,
-                AsUInt(item["Wear"]) is <= 100 and var wear ? $"Износ {wear}%" : null,
-                AsUInt(item["PowerOnHours"]) is < ushort.MaxValue and var hours ? $"Наработка {hours:N0} ч" : null),
+                AsUInt(item["Wear"]) is <= 100 and var wear ? UiText.Format($"Износ {wear}%") : null,
+                AsUInt(item["PowerOnHours"]) is < ushort.MaxValue and var hours ? UiText.Format($"Наработка {hours:N0} ч") : null),
             StorageScope).OfType<string>().FirstOrDefault();
     }
 
@@ -183,17 +210,17 @@ public partial class MainWindow
 
     private static string? FormatPartitionKind(string? gptType, uint? mbrType) => gptType?.Trim('{', '}').ToLowerInvariant() switch
     {
-        "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" => "Системный раздел EFI",
-        "e3c9e316-0b5c-4db8-817d-f92df00215ae" => "Резерв Microsoft (MSR)",
-        "de94bba4-06d1-4d40-a16a-bfd50179d6ac" => "Раздел восстановления",
-        _ => mbrType is 5 or 15 ? "Расширенный раздел MBR" : null
+        "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" => UiText.Get("Системный раздел EFI"),
+        "e3c9e316-0b5c-4db8-817d-f92df00215ae" => UiText.Get("Резерв Microsoft (MSR)"),
+        "de94bba4-06d1-4d40-a16a-bfd50179d6ac" => UiText.Get("Раздел восстановления"),
+        _ => mbrType is 5 or 15 ? UiText.Get("Расширенный раздел MBR") : null
     };
 
     private static string? FormatStorageBus(uint? bus) => bus switch
     {
         1 => "SCSI", 2 => "ATAPI", 3 => "ATA", 4 => "IEEE 1394", 6 => "Fibre Channel",
         7 => "USB", 8 => "RAID", 9 => "iSCSI", 10 => "SAS", 11 => "SATA", 12 => "SD",
-        13 => "MMC", 14 or 15 => "Виртуальный диск", 16 => "Storage Spaces", 17 => "NVMe", 19 => "UFS",
+        13 => "MMC", 14 or 15 => UiText.Get("Виртуальный диск"), 16 => "Storage Spaces", 17 => "NVMe", 19 => "UFS",
         _ => null
     };
 }

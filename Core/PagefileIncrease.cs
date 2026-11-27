@@ -39,7 +39,7 @@ internal static class PagefileIncrease
         string driveRoot = Path.GetPathRoot(file.Path)!;
         var drive = new DriveInfo(driveRoot);
         if (drive.DriveType != DriveType.Fixed)
-            throw new InvalidDataException("Файл подкачки должен находиться на локальном диске.");
+            throw new InvalidDataException(UiText.Get("Файл подкачки должен находиться на локальном диске."));
 
         ulong free = (ulong)drive.AvailableFreeSpace;
         uint capacity = (uint)Math.Min(uint.MaxValue, free / MiB + file.Allocated);
@@ -57,7 +57,7 @@ internal static class PagefileIncrease
 
         if (capacity < minimum)
             return new State(file, saved, minimum, 0, 0, capacity, free,
-                "На диске недостаточно места для увеличения файла подкачки с учётом текущих настроек и полного дампа памяти.");
+                UiText.Get("На диске недостаточно места для увеличения файла подкачки с учётом текущих настроек и полного дампа памяти."));
 
         uint initial = (uint)Math.Min(capacity, Math.Max(minimum, (ulong)baseline + 4096));
         // Preserve the previous manual maximum or estimate the ordinary system-managed growth limit.
@@ -87,18 +87,18 @@ internal static class PagefileIncrease
             int initialAt = prefix.LastIndexOf(' ');
             if (initialAt < 1 || !uint.TryParse(prefix.AsSpan(initialAt + 1), NumberStyles.None, CultureInfo.InvariantCulture, out uint initial) ||
                 !uint.TryParse(value.AsSpan(maximumAt + 1), NumberStyles.None, CultureInfo.InvariantCulture, out uint maximum))
-                throw new InvalidDataException("Windows использует формат файла подкачки, который CoreShift не может изменить.");
+                throw new InvalidDataException(UiText.Get("Windows использует формат файла подкачки, который CoreShift не может изменить."));
             string path = prefix[..initialAt].TrimEnd();
             if ((!IsLocalFile(path) && !path.Equals(automaticPath, StringComparison.OrdinalIgnoreCase)) ||
                 maximum < initial || (initial == 0 && maximum > 0))
-                throw new InvalidDataException("Windows использует конфигурацию файла подкачки, которую CoreShift не может изменить.");
+                throw new InvalidDataException(UiText.Get("Windows использует конфигурацию файла подкачки, которую CoreShift не может изменить."));
             configured.Add((entry, path, initial, maximum));
         }
 
         if (configured.Any(file => file.Path.Equals(automaticPath, StringComparison.OrdinalIgnoreCase)))
         {
             if (configured.Count != 1 || activeFiles.Any(file => !IsLocalFile(file.Name)))
-                throw new InvalidDataException("Текущие автоматические расположения файлов подкачки не удалось определить.");
+                throw new InvalidDataException(UiText.Get("Текущие автоматические расположения файлов подкачки не удалось определить."));
             var activePaths = activeFiles.Select(file => file.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             string path = activePaths.FirstOrDefault(file => OnDrive(file, windowsDrive)) ?? activePaths.FirstOrDefault()
                 ?? Path.Combine(windowsDrive, "pagefile.sys");
@@ -119,7 +119,7 @@ internal static class PagefileIncrease
 
         var selected = configured[index];
         if (configured.Count(file => file.Path.Equals(selected.Path, StringComparison.OrdinalIgnoreCase)) != 1)
-            throw new InvalidDataException("В параметрах Windows найдено несколько записей для одного файла подкачки.");
+            throw new InvalidDataException(UiText.Get("В параметрах Windows найдено несколько записей для одного файла подкачки."));
         configured.RemoveAt(index);
         return new Target(selected.Path, Allocation(selected.Path, activeFiles), selected.Initial, selected.Maximum,
             configured.Select(file => file.Entry).ToArray(), index, selected.Initial == 0);
@@ -131,7 +131,7 @@ internal static class PagefileIncrease
         try
         {
             if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
-                throw new InvalidOperationException("Другая операция с файлом подкачки ещё выполняется.");
+                throw new InvalidOperationException(UiText.Get("Другая операция с файлом подкачки ещё выполняется."));
         }
         catch (AbandonedMutexException) { }
 
@@ -139,22 +139,22 @@ internal static class PagefileIncrease
         {
             using var hive = OpenMachineHive();
             using var settings = hive.OpenSubKey(SettingsPath, writable: true)
-                ?? throw new InvalidOperationException("Параметры файла подкачки Windows недоступны.");
+                ?? throw new InvalidOperationException(UiText.Get("Параметры файла подкачки Windows недоступны."));
             using var backups = hive.CreateSubKey(TweaksEngine.BackupPath);
             string[]? current = ReadEntries(settings);
             if (restore)
                 return UpdateConfiguration(settings, backups, current, null);
 
             if (backups.GetValue(BackupName) is string)
-                throw new InvalidOperationException("Сначала восстановите исходные параметры файла подкачки.");
+                throw new InvalidOperationException(UiText.Get("Сначала восстановите исходные параметры файла подкачки."));
             State state = ReadState(current, saved: false);
             if (state.Issue is not null)
                 throw new InvalidOperationException(state.Issue);
             Target file = state.File!;
             if (!file.Path.Equals(expectedPath, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Расположение файла подкачки изменилось. Проверьте обновлённые параметры.");
+                throw new InvalidOperationException(UiText.Get("Расположение файла подкачки изменилось. Проверьте обновлённые параметры."));
             if (!state.Accepts(initial, maximum))
-                throw new ArgumentException("Размеры файла подкачки не подходят для текущих параметров и свободного места. Проверьте обновлённые пределы.");
+                throw new ArgumentException(UiText.Get("Размеры файла подкачки не подходят для текущих параметров и свободного места. Проверьте обновлённые пределы."));
 
             string entry = FormattableString.Invariant($"{file.Path} {initial} {maximum}");
             return UpdateConfiguration(settings, backups, current,
@@ -168,13 +168,13 @@ internal static class PagefileIncrease
     {
         string[]? current = ReadEntries(settings);
         if (!Same(current, expected))
-            throw new InvalidOperationException("Параметры файла подкачки изменились. Обновите состояние и повторите действие.");
+            throw new InvalidOperationException(UiText.Get("Параметры файла подкачки изменились. Обновите состояние и повторите действие."));
 
         string? saved = backups.GetValue(BackupName) as string;
         if (requested is not null)
         {
             if (saved is not null)
-                throw new InvalidOperationException("Сначала восстановите исходные параметры файла подкачки.");
+                throw new InvalidOperationException(UiText.Get("Сначала восстановите исходные параметры файла подкачки."));
             backups.SetValue(BackupName, JsonSerializer.Serialize(new SavedSettings(current, requested)), RegistryValueKind.String);
             backups.Flush();
             WriteEntries(settings, requested);
@@ -184,14 +184,14 @@ internal static class PagefileIncrease
         if (saved is null)
             return false;
         SavedSettings backup;
-        try { backup = JsonSerializer.Deserialize<SavedSettings>(saved) ?? throw new InvalidDataException("Резервная копия пуста."); }
-        catch (JsonException ex) { throw new InvalidDataException("Не удалось прочитать копию параметров файла подкачки.", ex); }
+        try { backup = JsonSerializer.Deserialize<SavedSettings>(saved) ?? throw new InvalidDataException(UiText.Get("Резервная копия пуста.")); }
+        catch (JsonException ex) { throw new InvalidDataException(UiText.Get("Не удалось прочитать копию параметров файла подкачки."), ex); }
         if (backup.Applied is not { Length: > 0 })
-            throw new InvalidDataException("Резервная копия параметров файла подкачки повреждена.");
+            throw new InvalidDataException(UiText.Get("Резервная копия параметров файла подкачки повреждена."));
         if (Same(current, backup.Applied))
             WriteEntries(settings, backup.Original);
         else if (!Same(current, backup.Original))
-            throw new InvalidOperationException("Параметры файла подкачки изменены в Windows. Резервная копия сохранена.");
+            throw new InvalidOperationException(UiText.Get("Параметры файла подкачки изменены в Windows. Резервная копия сохранена."));
         backups.DeleteValue(BackupName);
         return true;
     }
@@ -207,7 +207,7 @@ internal static class PagefileIncrease
     {
         null => null,
         string[] entries => entries,
-        _ => throw new InvalidDataException("Параметры файла подкачки имеют неожиданный тип.")
+        _ => throw new InvalidDataException(UiText.Get("Параметры файла подкачки имеют неожиданный тип."))
     };
 
     private static void WriteEntries(RegistryKey settings, string[]? entries)

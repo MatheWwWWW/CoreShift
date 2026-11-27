@@ -32,7 +32,7 @@ internal static class WindowEffects
         try
         {
             if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
-                throw new InvalidOperationException("Другая операция с визуальными эффектами ещё выполняется.");
+                throw new InvalidOperationException(UiText.Get("Другая операция с визуальными эффектами ещё выполняется."));
         }
         catch (AbandonedMutexException) { }
 
@@ -48,8 +48,8 @@ internal static class WindowEffects
             if (restore)
             {
                 Effects original;
-                try { original = JsonSerializer.Deserialize<Effects>(saved!) ?? throw new InvalidDataException("Резервная копия пуста."); }
-                catch (JsonException ex) { throw new InvalidDataException("Не удалось прочитать копию визуальных настроек.", ex); }
+                try { original = JsonSerializer.Deserialize<Effects>(saved!) ?? throw new InvalidDataException(UiText.Get("Резервная копия пуста.")); }
+                catch (JsonException ex) { throw new InvalidDataException(UiText.Get("Не удалось прочитать копию визуальных настроек."), ex); }
                 UpdateEffects(user, current, Disabled, original);
                 backups!.DeleteValue(BackupName);
                 return true;
@@ -58,7 +58,7 @@ internal static class WindowEffects
             if (current == Disabled)
                 return false;
             if (saved is not null)
-                throw new InvalidOperationException("Сначала восстановите исходные визуальные эффекты.");
+                throw new InvalidOperationException(UiText.Get("Сначала восстановите исходные визуальные эффекты."));
 
             using var backupKey = user.CreateSubKey(TweaksEngine.BackupPath);
             backupKey.SetValue(BackupName, JsonSerializer.Serialize(current), RegistryValueKind.String);
@@ -78,7 +78,7 @@ internal static class WindowEffects
         {
             null => null,
             int value => value,
-            _ => throw new InvalidDataException("Настройка прозрачности имеет неожиданный тип.")
+            _ => throw new InvalidDataException(UiText.Get("Настройка прозрачности имеет неожиданный тип."))
         };
         return new Effects(ReadSwitch(GetClientAreaAnimation), animation.MinimizeAndRestore != 0,
             ReadSwitch(GetMenuAnimation), ReadSwitch(GetTooltipAnimation), transparency);

@@ -11,7 +11,7 @@ internal static class MemoryOptimizer
     internal static (ulong? BeforeBytes, ulong? AfterBytes) TrimWorkingSet(int processId, DateTime? expectedStartUtc)
     {
         if (processId <= 4 || processId == Environment.ProcessId)
-            throw new ArgumentException("Укажите PID другого пользовательского процесса.");
+            throw new ArgumentException(UiText.Get("Укажите PID другого пользовательского процесса."));
 
         const uint queryLimitedInformation = 0x1000;
         const uint setQuota = 0x0100;
@@ -29,7 +29,7 @@ internal static class MemoryOptimizer
         if (!GetProcessTimes(handle, out long created, out _, out _, out _))
             throw new Win32Exception(Marshal.GetLastWin32Error());
         if (created != startUtc.ToFileTimeUtc())
-            throw new InvalidOperationException("Выбранный процесс уже завершился.");
+            throw new InvalidOperationException(UiText.Get("Выбранный процесс уже завершился."));
 
         ulong? before = ReadWorkingSet(handle);
         if (!EmptyWorkingSet(handle))

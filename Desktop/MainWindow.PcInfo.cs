@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Globalization;
 using System.Management;
 using System.Runtime.Intrinsics.X86;
@@ -13,19 +14,30 @@ namespace CoreShift.Desktop;
 
 public partial class MainWindow
 {
-    private const string Unavailable = "Недоступно";
+    private static string Unavailable => UiText.Get("Недоступно");
 
     private sealed record PcInfoRow(string Label, string Value, bool IsGroup = false);
-    private sealed record PcInfoSection(string Title, IReadOnlyList<PcInfoRow> Rows)
+    private sealed record PcInfoSection(string Title, IReadOnlyList<PcInfoRow> Rows) : INotifyPropertyChanged
     {
-        public bool Expanded { get; set; }
+        private bool expanded;
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public bool Expanded
+        {
+            get => expanded;
+            set
+            {
+                if (expanded == value) return;
+                expanded = value;
+                PropertyChanged?.Invoke(this, new(nameof(Expanded)));
+            }
+        }
     }
     private sealed record PcInfoCard(string Label, string Value, string? Detail);
     private sealed record PcInfoReport(PcInfoCard[] Summary, PcInfoSection[] Sections)
     {
         public string ToClipboardText()
         {
-            var report = new StringBuilder("CoreShift · Конфигурация компьютера");
+            var report = new StringBuilder(UiText.Get("CoreShift · Конфигурация компьютера"));
             foreach (var section in Sections)
             {
                 report.AppendLine().AppendLine().Append(section.Title);
@@ -43,21 +55,46 @@ public partial class MainWindow
     private sealed record ProcessorInfo(string Name, uint? Cores, uint? Threads, uint? FirmwareMHz, uint? L2KB, uint? L3KB,
         string? Socket, double? FirmwareVoltage)
     {
-        public string? Topology => JoinDetails(Cores is { } cores ? $"Ядра: {cores}" : null,
-            Threads is { } threads ? $"Потоки: {threads}" : null);
+        public string? Topology => JoinDetails(Cores is { } cores ? UiText.Format($"Ядра: {cores}") : null,
+            Threads is { } threads ? UiText.Format($"Потоки: {threads}") : null);
     }
 
     private sealed record MemoryModule(string Slot, string? Model, string? Type, ulong? Capacity,
         uint? ConfiguredSpeed, uint? RatedSpeed, uint? ConfiguredMillivolts, uint Ranks)
     {
         public string Description => JoinDetails(Type, Capacity is { } bytes ? FormatBytes(bytes) : null,
-            ConfiguredSpeed is { } configured ? $"{configured:N0} МТ/с (настроено)" : null,
-            RatedSpeed is { } rated ? $"{rated:N0} МТ/с (по SMBIOS)" : null,
+            ConfiguredSpeed is { } configured ? UiText.Format($"{configured:N0} МТ/с (настроено)") : null,
+            RatedSpeed is { } rated ? UiText.Format($"{rated:N0} МТ/с (по SMBIOS)") : null,
             Ranks > 0 ? $"{Ranks}R" : null, Model)
             ?? Unavailable;
     }
 
     private PcInfoReport? pcInfoReport;
+
+    private WebNode[] ProjectPcInfo(WebControlProjection projection)
+    {
+        var header = projection.Project("hardware", PcInfoHeader, PcInfoStatus, PcInfoSummary);
+        if (pcInfoReport is not { } report)
+            return header;
+
+        var sections = report.Sections.Select((section, index) =>
+        {
+            string id = $"hardware.section.{index}";
+            projection.Register(id, () => section.Expanded = !section.Expanded);
+            var rows = section.Expanded ? section.Rows.Select((row, position) =>
+            {
+                string key = $"{id}.row.{position}";
+                return new WebNode(key, "grid", Widths: "minmax(0,2fr) minmax(0,3fr)", Children:
+                [
+                    new(key + ".label", "text", Text: row.Label, Style: row.IsGroup ? "strong" : "muted"),
+                    new(key + ".value", "text", Text: row.Value, Column: 1)
+                ]);
+            }).ToArray() : [];
+            return new WebNode(id, "expander", Text: section.Title, Checked: section.Expanded,
+                Children: rows.Length == 0 ? [] : [new(id + ".body", "card", Children: rows)]);
+        }).ToArray();
+        return [.. header, new("hardware.sections", "items", Children: sections, Name: "PcInfoItems")];
+    }
 
     private async Task LoadPcInfoAsync()
     {
@@ -68,7 +105,7 @@ public partial class MainWindow
         PcInfoRefreshButton.IsEnabled = false;
         PcInfoCopyButton.IsEnabled = false;
         PcInfoStatus.Visibility = Visibility.Visible;
-        SetStatus(PcInfoStatus, "Получаем сведения о компьютере…");
+        SetStatus(PcInfoStatus, UiText.Get("Получаем сведения о компьютере…"));
         try
         {
             var report = await RunInBackground(ReadPcInfo);
@@ -94,7 +131,7 @@ public partial class MainWindow
         {
             Debug.WriteLine(ex);
             if (!closing)
-                SetStatus(PcInfoStatus, "Не удалось обновить сведения о компьютере.", error: true);
+                SetStatus(PcInfoStatus, UiText.Get("Не удалось обновить сведения о компьютере."), error: true);
         }
         finally
         {
@@ -109,6 +146,14 @@ public partial class MainWindow
 
     private async void RefreshPcInfoClick(object sender, RoutedEventArgs e) => await LoadPcInfoAsync();
 
+    private void ExpandPcInfoClick(object sender, RoutedEventArgs e)
+    {
+        if (pcInfoReport is not { } report) return;
+        bool expanded = report.Sections.Any(section => !section.Expanded);
+        foreach (var section in report.Sections)
+            section.Expanded = expanded;
+    }
+
     private void CopyPcInfoClick(object sender, RoutedEventArgs e)
     {
         if (pcInfoReport is not { } report || loadingPcInfo)
@@ -118,12 +163,12 @@ public partial class MainWindow
         try
         {
             Clipboard.SetText(report.ToClipboardText());
-            SetStatus(PcInfoStatus, "Отчёт скопирован.");
+            SetStatus(PcInfoStatus, UiText.Get("Отчёт скопирован."));
         }
         catch (ExternalException ex)
         {
             Debug.WriteLine(ex);
-            SetStatus(PcInfoStatus, "Буфер обмена занят. Попробуйте скопировать отчёт ещё раз.", error: true);
+            SetStatus(PcInfoStatus, UiText.Get("Буфер обмена занят. Попробуйте скопировать отчёт ещё раз."), error: true);
         }
     }
 
@@ -133,7 +178,7 @@ public partial class MainWindow
             ?? "Windows";
         string? board = ReadWmiValues("SELECT Manufacturer, Product, Version FROM Win32_BaseBoard", item =>
             JoinDetails(WmiText(item, "Manufacturer"), WmiText(item, "Product"),
-                WmiText(item, "Version") is { } version and not "x.x" ? $"рев. {version}" : null));
+                WmiText(item, "Version") is { } version and not "x.x" ? UiText.Format($"рев. {version}") : null));
         var bios = ReadWmi("SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS", item => (
             Version: JoinDetails(WmiText(item, "Manufacturer"), WmiText(item, "SMBIOSBIOSVersion")),
             Date: FormatFirmwareDate(WmiText(item, "ReleaseDate")))).FirstOrDefault();
@@ -154,7 +199,7 @@ public partial class MainWindow
         int[] arrays = ReadWmi("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray WHERE Use = 3",
             item => (int)(AsUInt(item["MemoryDevices"]) ?? 0)).ToArray();
         int slots = arrays.Length > 0 && arrays.All(count => count > 0) ? arrays.Sum() : 0;
-        string? slotUse = modules.Count > 0 && slots >= modules.Count ? $"{modules.Count} из {slots}" : null;
+        string? slotUse = modules.Count > 0 && slots >= modules.Count ? UiText.Format($"{modules.Count} из {slots}") : null;
         ulong? usable = null;
         try
         {
@@ -167,10 +212,10 @@ public partial class MainWindow
 
         var memoryRows = new List<PcInfoRow>
         {
-            new("Установлено", installed.HasValue ? FormatBytes(installed) : Unavailable),
-            new("Объём для Windows", usable.HasValue ? FormatBytes(usable) : Unavailable),
-            new("Установлено модулей", modules.Count > 0 ? modules.Count.ToString(CultureInfo.CurrentCulture) : Unavailable),
-            new("Слоты по SMBIOS", slotUse ?? Unavailable)
+            new(UiText.Get("Установлено"), installed.HasValue ? FormatBytes(installed) : Unavailable),
+            new(UiText.Get("Объём для Windows"), usable.HasValue ? FormatBytes(usable) : Unavailable),
+            new(UiText.Get("Установлено модулей"), modules.Count > 0 ? modules.Count.ToString(CultureInfo.CurrentCulture) : Unavailable),
+            new(UiText.Get("Слоты по SMBIOS"), slotUse ?? Unavailable)
         };
         memoryRows.AddRange(modules.Select(module => new PcInfoRow(module.Slot, module.Description)));
 
@@ -178,19 +223,19 @@ public partial class MainWindow
         var voltages = new List<PcInfoRow>();
         var temperatures = new List<PcInfoRow>();
         ReadHardwareSensors(timings, voltages, temperatures);
-        memoryRows.Add(new("Тайминги SPD", timings.Count > 0
+        memoryRows.Add(new(UiText.Get("Тайминги SPD"), timings.Count > 0
             ? string.Join(Environment.NewLine, timings.Select(row => $"{row.Label} · {row.Value}"))
-            : "Недоступны для текущей конфигурации"));
+            : UiText.Get("Недоступны для текущей конфигурации")));
 
         if (voltages.Count == 0)
-            voltages.Add(new("Датчики напряжения", Unavailable));
+            voltages.Add(new(UiText.Get("Датчики напряжения"), Unavailable));
         var cpuVoltages = processors.Where(processor => processor.FirmwareVoltage.HasValue)
-            .Select(processor => JoinDetails(processor.Name, $"{processor.FirmwareVoltage:0.0} В")).ToArray();
+            .Select(processor => JoinDetails(processor.Name, UiText.Format($"{processor.FirmwareVoltage:0.0} В"))).ToArray();
         if (cpuVoltages.Length > 0)
-            voltages.Add(new("ЦП по данным SMBIOS", string.Join(Environment.NewLine, cpuVoltages)));
+            voltages.Add(new(UiText.Get("ЦП по данным SMBIOS"), string.Join(Environment.NewLine, cpuVoltages)));
         string[] configuredVoltages = modules.Where(module => module.ConfiguredMillivolts.HasValue)
-            .Select(module => $"{module.Slot} · {module.ConfiguredMillivolts.GetValueOrDefault() / 1000d:0.###} В").ToArray();
-        voltages.Add(new("ОЗУ по настройкам BIOS", configuredVoltages.Length > 0
+            .Select(module => UiText.Format($"{module.Slot} · {module.ConfiguredMillivolts.GetValueOrDefault() / 1000d:0.###} В")).ToArray();
+        voltages.Add(new(UiText.Get("ОЗУ по настройкам BIOS"), configuredVoltages.Length > 0
             ? string.Join(Environment.NewLine, configuredVoltages)
             : Unavailable));
 
@@ -201,24 +246,24 @@ public partial class MainWindow
             var processor = processors[index];
             var model = SplitProcessorFrequency(processor.Name);
             uint? frequency = baseFrequency ?? model.MHz;
-            cpuRows.Add(new(processors.Count > 1 ? $"Процессор {index + 1}" : "Модель", processor.Name));
-            cpuRows.Add(new("Ядра и потоки", processor.Topology ?? Unavailable));
+            cpuRows.Add(new(processors.Count > 1 ? UiText.Format($"Процессор {index + 1}") : UiText.Get("Модель"), processor.Name));
+            cpuRows.Add(new(UiText.Get("Ядра и потоки"), processor.Topology ?? Unavailable));
             if (frequency is { } mhz)
-                cpuRows.Add(new(baseFrequency.HasValue ? "Базовая частота (CPUID)" : "Частота в названии модели", FormatFrequency(mhz)!));
+                cpuRows.Add(new(baseFrequency.HasValue ? UiText.Get("Базовая частота (CPUID)") : UiText.Get("Частота в названии модели"), FormatFrequency(mhz)!));
             if (frequency is null || processor.FirmwareMHz is { } firmwareMHz && firmwareMHz != frequency)
-                cpuRows.Add(new("Частота по SMBIOS", FormatFrequency(processor.FirmwareMHz) ?? Unavailable));
-            cpuRows.Add(new("Кэш L2 / L3", JoinDetails(processor.L2KB is { } l2 ? $"L2 · {FormatBytes((ulong)l2 * 1024)}" : null,
+                cpuRows.Add(new(UiText.Get("Частота по SMBIOS"), FormatFrequency(processor.FirmwareMHz) ?? Unavailable));
+            cpuRows.Add(new(UiText.Get("Кэш L2 / L3"), JoinDetails(processor.L2KB is { } l2 ? $"L2 · {FormatBytes((ulong)l2 * 1024)}" : null,
                 processor.L3KB is { } l3 ? $"L3 · {FormatBytes((ulong)l3 * 1024)}" : null) ?? Unavailable));
-            cpuRows.Add(new("Сокет", processor.Socket ?? Unavailable));
+            cpuRows.Add(new(UiText.Get("Сокет"), processor.Socket ?? Unavailable));
         }
 
         var gpuRows = new List<PcInfoRow>();
         for (int index = 0; index < graphics.Count; index++)
         {
             var adapter = graphics[index];
-            gpuRows.Add(new(graphics.Count > 1 ? $"Видеоадаптер {index + 1}" : "Модель", adapter.Name));
-            gpuRows.Add(new("Выделенная видеопамять", adapter.VideoMemory is { } videoBytes ? FormatBytes(videoBytes) : Unavailable));
-            gpuRows.Add(new("Версия драйвера", adapter.Driver ?? Unavailable));
+            gpuRows.Add(new(graphics.Count > 1 ? UiText.Format($"Видеоадаптер {index + 1}") : UiText.Get("Модель"), adapter.Name));
+            gpuRows.Add(new(UiText.Get("Выделенная видеопамять"), adapter.VideoMemory is { } videoBytes ? FormatBytes(videoBytes) : Unavailable));
+            gpuRows.Add(new(UiText.Get("Версия драйвера"), adapter.Driver ?? Unavailable));
         }
 
         var processorSummary = processors.FirstOrDefault();
@@ -226,49 +271,49 @@ public partial class MainWindow
         var graphicsSummary = graphics.FirstOrDefault();
         string? memoryType = string.Join(" / ", modules.Select(module => module.Type).OfType<string>().Distinct());
         string? memorySpeed = string.Join(" / ", modules.Select(module => module.ConfiguredSpeed).OfType<uint>()
-            .Distinct().OrderBy(speed => speed).Select(speed => $"{speed} МТ/с"));
+            .Distinct().OrderBy(speed => speed).Select(speed => UiText.Format($"{speed} МТ/с")));
         ulong? totalMemory = installed ?? usable;
         string memoryValue = totalMemory is { } totalBytes
             ? JoinDetails(FormatBytes(totalBytes), NonEmpty(memoryType))! : Unavailable;
 
         PcInfoCard[] summary =
         [
-            new("Процессор", CountedName(ShortProcessorName(processorModel.Name), processors.Count),
+            new(UiText.Get("Процессор"), CountedName(ShortProcessorName(processorModel.Name), processors.Count),
                 JoinDetails(processorSummary?.Topology, FormatFrequency(baseFrequency ?? processorModel.MHz ?? processorSummary?.FirmwareMHz))),
-            new("Видеокарта", CountedName(graphicsSummary?.Name, graphics.Count),
-                graphicsSummary?.VideoMemory is { } vram ? $"{FormatBytes(vram)} видеопамяти" : null),
-            new("Оперативная память", memoryValue,
-                JoinDetails(NonEmpty(memorySpeed), slotUse is not null ? $"Слоты: {slotUse}" : null)),
-            new("Накопители", storage.Summary, storage.WindowsVolume)
+            new(UiText.Get("Видеокарта"), CountedName(graphicsSummary?.Name, graphics.Count),
+                graphicsSummary?.VideoMemory is { } vram ? UiText.Format($"{FormatBytes(vram)} видеопамяти") : null),
+            new(UiText.Get("Оперативная память"), memoryValue,
+                JoinDetails(NonEmpty(memorySpeed), slotUse is not null ? UiText.Format($"Слоты: {slotUse}") : null)),
+            new(UiText.Get("Накопители"), storage.Summary, storage.WindowsVolume)
         ];
 
         PcInfoSection[] sections =
         [
-            new("Накопители", storage.Rows) { Expanded = true },
-            new("Процессоры", AvailableRows(cpuRows)),
-            new("Видеоадаптеры", AvailableRows(gpuRows)),
-            new("Оперативная память", memoryRows),
-            new("Мониторы", AvailableRows(ReadMonitorInfo())),
-            new("Система",
+            new(UiText.Get("Накопители"), storage.Rows) { Expanded = true },
+            new(UiText.Get("Процессоры"), AvailableRows(cpuRows)),
+            new(UiText.Get("Видеоадаптеры"), AvailableRows(gpuRows)),
+            new(UiText.Get("Оперативная память"), memoryRows),
+            new(UiText.Get("Мониторы"), AvailableRows(ReadMonitorInfo())),
+            new(UiText.Get("Система"),
             [
-                new("Имя компьютера", Environment.MachineName),
-                new("Операционная система", $"{windows} · сборка {Environment.OSVersion.Version.Build} · {RuntimeInformation.OSArchitecture}"),
-                new("Материнская плата", board ?? Unavailable),
-                new("Версия прошивки", bios.Version ?? Unavailable),
-                new("Дата прошивки", bios.Date ?? Unavailable),
-                new("Режим загрузки", firmware.Mode ?? Unavailable),
+                new(UiText.Get("Имя компьютера"), Environment.MachineName),
+                new(UiText.Get("Операционная система"), UiText.Format($"{windows} · сборка {Environment.OSVersion.Version.Build} · {RuntimeInformation.OSArchitecture}")),
+                new(UiText.Get("Материнская плата"), board ?? Unavailable),
+                new(UiText.Get("Версия прошивки"), bios.Version ?? Unavailable),
+                new(UiText.Get("Дата прошивки"), bios.Date ?? Unavailable),
+                new(UiText.Get("Режим загрузки"), firmware.Mode ?? Unavailable),
                 new("Secure Boot", firmware.SecureBoot ?? Unavailable)
             ]),
-            new("Температуры датчиков", AvailableRows(temperatures)),
-            new("Напряжения", voltages)
+            new(UiText.Get("Температуры датчиков"), AvailableRows(temperatures)),
+            new(UiText.Get("Напряжения"), voltages)
         ];
         return new PcInfoReport(summary, sections);
     }
 
     private static IReadOnlyList<PcInfoRow> AvailableRows(List<PcInfoRow> rows) =>
-        rows.Count > 0 ? rows : [new("Сведения", Unavailable)];
+        rows.Count > 0 ? rows : [new(UiText.Get("Сведения"), Unavailable)];
 
-    private static string CountedName(string? first, int count) => count > 1 ? $"{first} и ещё {count - 1}" : first ?? Unavailable;
+    private static string CountedName(string? first, int count) => count > 1 ? UiText.Format($"{first} и ещё {count - 1}") : first ?? Unavailable;
 
     private static string? ShortProcessorName(string? name)
     {
@@ -280,7 +325,7 @@ public partial class MainWindow
         return shortName.EndsWith(" CPU", StringComparison.OrdinalIgnoreCase) ? shortName[..^4] : shortName;
     }
 
-    private static string? FormatFrequency(uint? mhz) => mhz is { } value ? $"{value / 1000d:0.##} ГГц" : null;
+    private static string? FormatFrequency(uint? mhz) => mhz is { } value ? UiText.Format($"{value / 1000d:0.##} ГГц") : null;
 
     private static (string? Name, uint? MHz) SplitProcessorFrequency(string? name)
     {
@@ -319,7 +364,7 @@ public partial class MainWindow
         if (!GetFirmwareType(out uint type))
             return (null, null);
         if (type == 1)
-            return ("BIOS (Legacy)", "Доступно в режиме UEFI");
+            return ("BIOS (Legacy)", UiText.Get("Доступно в режиме UEFI"));
         if (type != 2)
             return (null, null);
 
@@ -327,7 +372,7 @@ public partial class MainWindow
         try
         {
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\State");
-            secureBoot = key?.GetValue("UEFISecureBootEnabled") switch { 1 => "Включена", 0 => "Выключена", _ => null };
+            secureBoot = key?.GetValue("UEFISecureBootEnabled") switch { 1 => UiText.Get("Включена"), 0 => UiText.Get("Выключена"), _ => null };
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
@@ -342,7 +387,7 @@ public partial class MainWindow
     private static extern bool GetFirmwareType(out uint firmwareType);
 
     private static MemoryModule ReadMemoryModule(ManagementBaseObject item) => new(
-        JoinDetails(WmiText(item, "DeviceLocator"), WmiText(item, "BankLabel")) ?? "Модуль памяти",
+        JoinDetails(WmiText(item, "DeviceLocator"), WmiText(item, "BankLabel")) ?? UiText.Get("Модуль памяти"),
         JoinDetails(WmiText(item, "Manufacturer"), WmiText(item, "PartNumber")),
         (item["SMBIOSMemoryType"] as uint?) switch
         {
@@ -443,9 +488,9 @@ public partial class MainWindow
                 var voltageValues = hardware.Sensors.Where(sensor => sensor.SensorType == SensorType.Voltage &&
                     !sensor.Name.Contains("VID", StringComparison.OrdinalIgnoreCase) &&
                     sensor.Value is float voltage && float.IsFinite(voltage) && voltage != 0)
-                    .Select(sensor => $"{sensor.Name} · {sensor.Value:0.###} В").ToArray();
+                    .Select(sensor => UiText.Format($"{sensor.Name} · {sensor.Value:0.###} В")).ToArray();
                 if (voltageValues.Length > 0)
-                    voltages.Add(new($"{componentName} (датчик)", string.Join(Environment.NewLine, voltageValues)));
+                    voltages.Add(new(UiText.Format($"{componentName} (датчик)"), string.Join(Environment.NewLine, voltageValues)));
             }
 
             if (hardware.HardwareType is HardwareType.Cpu or HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel)
@@ -477,7 +522,7 @@ public partial class MainWindow
             var sensor = sensors.FirstOrDefault(sensor => sensor.SensorType == SensorType.Timing &&
                 sensor.Name.StartsWith(name + " (", StringComparison.Ordinal));
             if (sensor?.Value is float delay && float.IsFinite(delay) && delay > 0)
-                timings.Add($"{name} {delay:0.###} нс");
+                timings.Add(UiText.Format($"{name} {delay:0.###} нс"));
         }
 
         return timings.Count > 0 ? string.Join(" · ", timings) : null;

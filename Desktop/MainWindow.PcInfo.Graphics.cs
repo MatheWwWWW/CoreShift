@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using SmartResourceDispatcher.Core;
 
 namespace CoreShift.Desktop;
 
@@ -115,11 +116,11 @@ public partial class MainWindow
                     0 => "VGA", 4 => "DVI", 5 => "HDMI", 10 => "DisplayPort", 11 => "eDP", 15 => "Miracast", _ => null
                 };
                 string? name = ReadMonitorName(path.Target);
-                rows.Add(new($"Монитор {index + 1}", JoinDetails(
+                rows.Add(new(UiText.Format($"Монитор {index + 1}"), JoinDetails(
                     name,
                     desktop ?? signal,
-                    hz is { } refresh ? $"{refresh:0.##} Гц" : null,
-                    desktop is not null && signal is not null && desktop != signal ? $"Сигнал {signal}" : null,
+                    hz is { } refresh ? UiText.Format($"{refresh:0.##} Гц") : null,
+                    desktop is not null && signal is not null && desktop != signal ? UiText.Format($"Сигнал {signal}") : null,
                     string.Equals(name, connector, StringComparison.OrdinalIgnoreCase) ? null : connector) ?? Unavailable));
             }
             return rows;

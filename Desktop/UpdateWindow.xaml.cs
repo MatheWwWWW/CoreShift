@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using SmartResourceDispatcher.Core;
 
 namespace CoreShift.Desktop;
 
@@ -29,7 +30,7 @@ public partial class UpdateWindow : Window
         this.requestedVersion = requestedVersion;
         this.releaseUpdateMutex = releaseUpdateMutex;
         InitializeComponent();
-        ShowActivity("Закрываем основное окно…");
+        ShowActivity(UiText.Get("Закрываем основное окно…"));
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -49,7 +50,7 @@ public partial class UpdateWindow : Window
                 await previousApp.WaitForExitAsync(handoff.Token);
             token.ThrowIfCancellationRequested();
 
-            ShowActivity("Проверяем релиз на GitHub…");
+            ShowActivity(UiText.Get("Проверяем релиз на GitHub…"));
             var release = await AppUpdater.FetchLatestAsync(token);
             if (release is null || release.Version < requestedVersion)
                 throw new InvalidDataException("The requested update is no longer published.");
@@ -57,7 +58,7 @@ public partial class UpdateWindow : Window
             installerPath = AppUpdater.CreateInstallerPath();
             logPath = Path.ChangeExtension(installerPath, ".log");
             downloading = true;
-            Stage.Text = $"Скачиваем версию {release.Version}…";
+            Stage.Text = UiText.Format($"Скачиваем версию {release.Version}…");
             SetProgress(0);
             using var installer = await AppUpdater.DownloadAsync(release, installerPath, token,
                 new Progress<int>(OnDownloadProgress));
@@ -66,14 +67,14 @@ public partial class UpdateWindow : Window
             downloading = false;
             installing = true;
             ActionButton.IsEnabled = false;
-            ShowActivity("Устанавливаем обновление…");
+            ShowActivity(UiText.Get("Устанавливаем обновление…"));
             using var setup = AppUpdater.StartInstaller(installer.Name, installDirectory, logPath);
             await setup.WaitForExitAsync();
             installerExitCode = setup.ExitCode;
             if (installerExitCode == 3010)
             {
                 restartRequired = true;
-                ShowResult("Обновление установлено", "Перезагрузите Windows, чтобы завершить установку.", "Закрыть");
+                ShowResult(UiText.Get("Обновление установлено"), UiText.Get("Перезагрузите Windows, чтобы завершить установку."), UiText.Get("Закрыть"));
                 return;
             }
 
@@ -81,7 +82,7 @@ public partial class UpdateWindow : Window
                 throw new InvalidOperationException($"CoreShift Setup exited with {installerExitCode}. See {logPath}.");
 
             installationCompleted = true;
-            ShowResult("Обновление установлено", "Открываем CoreShift…", "Открыть CoreShift", enableAction: false);
+            ShowResult(UiText.Get("Обновление установлено"), UiText.Get("Открываем CoreShift…"), UiText.Get("Открыть CoreShift"), enableAction: false);
             if (SystemParameters.ClientAreaAnimation)
                 await Task.Delay(260);
             ReopenCoreShift();
@@ -93,7 +94,7 @@ public partial class UpdateWindow : Window
         catch (Exception ex) when (AppUpdater.IsUpdateError(ex))
         {
             Debug.WriteLine(ex);
-            ShowFailure(installing ? "Не удалось установить обновление." : "Не удалось скачать или проверить обновление.");
+            ShowFailure(installing ? UiText.Get("Не удалось установить обновление.") : UiText.Get("Не удалось скачать или проверить обновление."));
         }
         finally
         {
@@ -112,7 +113,7 @@ public partial class UpdateWindow : Window
         if (value == 100)
         {
             downloading = false;
-            ShowActivity("Проверяем установщик…");
+            ShowActivity(UiText.Get("Проверяем установщик…"));
         }
         else
         {
@@ -154,7 +155,7 @@ public partial class UpdateWindow : Window
 
     private void ShowFailure(string message)
     {
-        Heading.Text = "Обновление прервано";
+        Heading.Text = UiText.Get("Обновление прервано");
         SetProgress(0, showPercent: false);
         ShowRetry(message);
     }
@@ -165,7 +166,7 @@ public partial class UpdateWindow : Window
         downloading = installing = false;
         Stage.Text = message;
         Stage.Foreground = (Brush)FindResource("Warning");
-        ActionButton.Content = "Открыть CoreShift";
+        ActionButton.Content = UiText.Get("Открыть CoreShift");
         ActionButton.IsEnabled = true;
     }
 
@@ -199,7 +200,7 @@ public partial class UpdateWindow : Window
     private void CancelDownload()
     {
         ActionButton.IsEnabled = false;
-        ShowActivity("Отменяем обновление…");
+        ShowActivity(UiText.Get("Отменяем обновление…"));
         downloadStop.Cancel();
     }
 
@@ -221,8 +222,8 @@ public partial class UpdateWindow : Window
         {
             Debug.WriteLine(ex);
             string message = ex is Win32Exception { NativeErrorCode: ErrorCancelled }
-                ? "Запуск отменён. При повторной попытке подтвердите запрос Windows."
-                : "Не удалось открыть CoreShift. Попробуйте ещё раз или откройте его из меню «Пуск».";
+                ? UiText.Get("Запуск отменён. При повторной попытке подтвердите запрос Windows.")
+                : UiText.Get("Не удалось открыть CoreShift. Попробуйте ещё раз или откройте его из меню «Пуск».");
             if (installationCompleted)
                 ShowRetry(message);
             else

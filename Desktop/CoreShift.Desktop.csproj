@@ -6,7 +6,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Version>1.1.9</Version>
     <ApplicationIcon>CoreShift.ico</ApplicationIcon>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(Configuration)' != 'Debug'">app.manifest</ApplicationManifest>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -15,9 +15,16 @@
     <Using Remove="System.Windows.Forms" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <PackageReference Include="Markdig" Version="1.6.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" GeneratePathProperty="true" />
     <ProjectReference Include="../SmartResourceDispatcher.csproj" />
+    <EmbeddedResource Include="Assets/OperationComplete.wav" LogicalName="CoreShift.OperationComplete.wav" />
+    <EmbeddedResource Include="Web/*" LogicalName="CoreShift.Web.%(Filename)%(Extension)" />
     <None Update="ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
           ExcludeFromSingleFile="true" />
+    <None Include="$(PkgMicrosoft_Web_WebView2)/LICENSE.txt" Link="WebView2-License.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="$(PkgMicrosoft_Web_WebView2)/NOTICE.txt" Link="WebView2-Notice.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
   <Target Name="ConfigureDesktopBundle" BeforeTargets="_ComputeFilesToBundle">
     <ItemGroup>
@@ -32,7 +39,8 @@
                   or '%(ResolvedFileToPublish.RelativePath)' == 'ijwhost.dll'
                   or '%(ResolvedFileToPublish.RelativePath)' == 'vcruntime140_cor3.dll'" />
       <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" ExcludeFromSingleFile="true"
-          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'LibreHardwareMonitorLib.dll'" />
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'LibreHardwareMonitorLib.dll'
+                  or '%(ResolvedFileToPublish.Filename)' == 'WebView2Loader'" />
     </ItemGroup>
   </Target>
 </Project>

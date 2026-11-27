@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
@@ -19,16 +20,22 @@ public partial class App : Application
         using var identity = WindowsIdentity.GetCurrent();
         if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
         {
+#if DEBUG
+            Shutdown(RestartAsAdministrator(e.Args));
+#else
             Shutdown(1);
+#endif
             return;
         }
 
         if (e.Args is ["--update", var parent, var ready, var version])
         {
+            AppAppearance.Apply(AppPreferences.Load(LocalState.UserProfile));
             StartUpdateWorker(parent, ready, version);
             return;
         }
 
+        bool autoStart = e.Args.Contains("--startup", StringComparer.Ordinal);
         if (Mutex.TryOpenExisting(AppUpdater.WorkerMutex, out var worker))
         {
             using (worker)
@@ -47,18 +54,63 @@ public partial class App : Application
         instanceMutex = new Mutex(true, instanceName, out bool firstInstance);
         if (!firstInstance)
         {
-            showWindow.Set();
+            if (!autoStart)
+                showWindow.Set();
             Shutdown();
             return;
         }
 
         var window = new MainWindow();
+        if (!window.PreferNativeInterface && !e.Args.Contains("--native-ui", StringComparer.Ordinal))
+            window.EnableWebInterface();
         MainWindow = window;
         showRegistration = ThreadPool.RegisterWaitForSingleObject(showWindow, (_, _) =>
             Dispatcher.InvokeAsync(window.ShowFromTray), null, Timeout.Infinite, executeOnlyOnce: false);
 
+        if (autoStart || window.StartMinimized)
+        {
+            window.ShowActivated = false;
+            window.WindowState = WindowState.Minimized;
+        }
         window.Show();
+        if (autoStart)
+            window.Hide();
     }
+
+#if DEBUG
+    private static int RestartAsAdministrator(string[] arguments)
+    {
+        if (Environment.ProcessPath is not { } executable)
+            return 1;
+
+        var startInfo = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = true,
+            Verb = "runas",
+            WorkingDirectory = Environment.CurrentDirectory
+        };
+        if (string.Equals(Path.GetFileName(executable), "dotnet.exe", StringComparison.OrdinalIgnoreCase))
+            startInfo.ArgumentList.Add(typeof(App).Assembly.Location);
+        foreach (string argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        try
+        {
+            using var elevated = Process.Start(startInfo);
+            return elevated is null ? 1 : 0;
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // Windows reports canceled UAC consent as ERROR_CANCELLED.
+            return 0;
+        }
+        catch (Win32Exception ex)
+        {
+            MessageBox.Show(ex.Message, "CoreShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            return 1;
+        }
+    }
+#endif
 
     private void StartUpdateWorker(string parent, string ready, string version)
     {

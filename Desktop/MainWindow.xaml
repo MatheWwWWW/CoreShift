@@ -2,27 +2,42 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="CoreShift" Width="1220" Height="790" MinWidth="900" MinHeight="640"
-        WindowStartupLocation="CenterScreen" Background="{StaticResource Canvas}"
-        Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13"
-        UseLayoutRounding="True" Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnWindowStateChanged">
+        Title="CoreShift" Width="1330" Height="850" MinWidth="920" MinHeight="650"
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource Canvas}"
+        Foreground="{DynamicResource Text}" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="{DynamicResource UiScale}"
+        UseLayoutRounding="True" Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnWindowStateChanged"
+        PreviewKeyDown="WindowPreviewKeyDown" SourceInitialized="WindowSourceInitialized">
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="48" ResizeBorderThickness="6" GlassFrameThickness="0"
+        <shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="6" GlassFrameThickness="0"
                             CornerRadius="0" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <DataTemplate x:Key="WindowsTweakCard">
-            <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+        <DataTemplate x:Key="WindowsSettingCard">
+            <Border Style="{StaticResource PolicyCard}">
                 <StackPanel>
                     <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding State}" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding Status}" Foreground="{DynamicResource Accent}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Detail}" Style="{StaticResource SecondaryText}" Margin="0,4,0,9" />
+                    <WrapPanel>
+                        <Button Tag="{Binding}" AutomationProperties.AutomationId="enable" Content="{DynamicResource 'UI:Включить'}" IsEnabled="{Binding CanEnable}" Click="ChangeWindowsSettingClick" Margin="0,0,6,0" />
+                        <Button Tag="{Binding}" AutomationProperties.AutomationId="disable" Content="{DynamicResource 'UI:Отключить'}" IsEnabled="{Binding CanDisable}" Click="ChangeWindowsSettingClick" Margin="0,0,6,0" />
+                        <Button Tag="{Binding}" AutomationProperties.AutomationId="restore" Content="{DynamicResource 'UI:Восстановить'}" IsEnabled="{Binding CanRestore}" Click="ChangeWindowsSettingClick" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="WindowsTweakCard">
+            <Border Style="{StaticResource PolicyCard}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding State}" Foreground="{DynamicResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
                     <TextBlock Text="{Binding Description}" Style="{StaticResource SecondaryText}" Margin="0,5,0,0" />
                     <TextBlock Text="{Binding Risk}" Style="{StaticResource SecondaryText}" Margin="0,4,0,0" />
                     <WrapPanel Margin="0,10,0,0">
-                        <Button Content="Применить" Tag="{Binding}" IsEnabled="{Binding CanApply}"
+                        <Button Content="{DynamicResource 'UI:Применить'}" Tag="{Binding}" IsEnabled="{Binding CanApply}"
                                 Style="{StaticResource PrimaryButton}" Click="ApplyTweakClick" Margin="0,0,8,0" />
-                        <Button Content="Восстановить" Tag="{Binding}" IsEnabled="{Binding CanRestore}" Click="RestoreTweakClick" />
-                        <Button Content="Параметры пользователя" Tag="{Binding SettingsUri}" Click="OpenTweakSettingsClick" Margin="8,0,0,0">
+                        <Button Content="{DynamicResource 'UI:Восстановить'}" Tag="{Binding}" IsEnabled="{Binding CanRestore}" Click="RestoreTweakClick" />
+                        <Button Content="{DynamicResource 'UI:Параметры пользователя'}" Tag="{Binding SettingsUri}" Click="OpenTweakSettingsClick" Margin="8,0,0,0">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                     <Style.Triggers>
@@ -38,47 +53,94 @@
             </Border>
         </DataTemplate>
     </Window.Resources>
-    <Grid x:Name="WindowSurface" Background="{StaticResource Canvas}">
+    <Grid>
+    <Grid x:Name="WindowSurface" Background="{DynamicResource Canvas}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="48" />
+            <RowDefinition Height="64" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Background="{StaticResource Rail}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="False">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="20,0">
-                    <Border Width="27" Height="27" CornerRadius="7" Background="{StaticResource Accent}" VerticalAlignment="Center">
-                        <Path Data="M 10,1 L 3,9 H 8 L 6,16 L 14,7 H 9 Z"
-                              Fill="#151B10" Width="13" Height="16" Stretch="Uniform"
+        <Grid Grid.RowSpan="3" IsHitTestVisible="False">
+          <Viewbox Stretch="UniformToFill" ClipToBounds="True" Opacity=".65">
+            <Canvas Width="1200" Height="760">
+              <Path Stroke="{DynamicResource CircuitTrace}" StrokeThickness="1" Data="M 0,160 H 172 L 238,94 H 448 L 490,52 H 1170 M 0,195 H 199 L 254,140 H 501 L 522,118 H 1050 M 1200,288 H 1042 L 956,374 H 826 L 762,438 H 541 M 1200,329 H 1075 L 1008,396 H 862 L 798,460 H 655 M 1200,678 H 1030 L 985,633 H 760 L 712,585 H 570 M 1200,700 H 990 L 947,657 H 748 M 0,610 H 184 L 244,550 H 442" />
+            </Canvas>
+          </Viewbox>
+          <Rectangle>
+            <Rectangle.Fill>
+              <RadialGradientBrush Center=".25,0" GradientOrigin=".25,0" RadiusX=".72" RadiusY=".64">
+                <GradientStop Color="{DynamicResource BackdropHalo}" Offset="0" />
+                <GradientStop Color="{DynamicResource BackdropHaloClear}" Offset="1" />
+              </RadialGradientBrush>
+            </Rectangle.Fill>
+          </Rectangle>
+          <Rectangle>
+            <Rectangle.Fill>
+              <RadialGradientBrush Center=".95,.9" GradientOrigin=".95,.9" RadiusX=".55" RadiusY=".55">
+                <GradientStop Color="{DynamicResource BackdropSide}" Offset="0" />
+                <GradientStop Color="{DynamicResource BackdropSideClear}" Offset="1" />
+              </RadialGradientBrush>
+            </Rectangle.Fill>
+          </Rectangle>
+        </Grid>
+        <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Background="{DynamicResource GlassRail}">
+            <Grid Margin="0,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="206" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Margin="22,0">
+                    <Border Width="32" Height="32" CornerRadius="10" Background="{DynamicResource Accent}" VerticalAlignment="Center">
+                        <Path Data="{StaticResource CoreShiftMark}"
+                              Stroke="{DynamicResource AccentText}" StrokeThickness="1.4" StrokeLineJoin="Round"
+                              Width="17" Height="17" Stretch="Uniform"
                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="CoreShift" FontWeight="Bold" FontSize="17" VerticalAlignment="Center" Margin="9,0,0,0" />
+                    <TextBlock Text="CoreShift" FontWeight="SemiBold" FontSize="20" VerticalAlignment="Center" Margin="10,0,0,0" />
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Button Style="{StaticResource TitleButton}" ToolTip="Свернуть" AutomationProperties.Name="Свернуть" Click="MinimizeClick">
+                <Button Grid.Column="1" x:Name="OpenSearchButton" Click="OpenSearchClick"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True" VerticalAlignment="Center"
+                        Width="340" HorizontalAlignment="Right" Margin="18,0,18,0" Background="{DynamicResource GlassCard}" HorizontalContentAlignment="Stretch"
+                        AutomationProperties.Name="{DynamicResource 'UI:Поиск разделов и действий'}">
+                    <DockPanel>
+                        <Path DockPanel.Dock="Left" Data="{StaticResource SearchIcon}" Stroke="{DynamicResource Accent}"
+                              Width="15" Height="15" StrokeThickness="1.6" Stretch="Uniform" Margin="0,0,10,0" />
+                        <Border DockPanel.Dock="Right" CornerRadius="5" Background="{DynamicResource Canvas}" Padding="6,1" Margin="8,0,0,0">
+                            <TextBlock Text="Ctrl+K" FontSize="11" Foreground="{DynamicResource Muted}" />
+                        </Border>
+                        <TextBlock Text="{DynamicResource 'UI:Поиск разделов и действий'}" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+                </Button>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="SettingsButton" Style="{StaticResource GearButton}" ToolTip="{DynamicResource 'UI:Настройки'}" AutomationProperties.Name="{DynamicResource 'UI:Настройки'}" Click="OpenSettingsClick">
+                        <Path Data="{StaticResource SettingsIcon}" Stroke="{DynamicResource Muted}" Width="15" Height="15"
+                              StrokeThickness="1.5" Stretch="Uniform" />
+                    </Button>
+                    <Button Style="{StaticResource TitleButton}" ToolTip="{DynamicResource 'UI:Свернуть'}" AutomationProperties.Name="{DynamicResource 'UI:Свернуть'}" Click="MinimizeClick">
                         <Path Data="M 0,5 H 10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
-                    <Button x:Name="MaximizeButton" Style="{StaticResource TitleButton}" ToolTip="Развернуть"
-                            AutomationProperties.Name="Развернуть" Click="MaximizeClick">
+                    <Button x:Name="MaximizeButton" Style="{StaticResource TitleButton}" ToolTip="{DynamicResource 'UI:Развернуть'}"
+                            AutomationProperties.Name="{DynamicResource 'UI:Развернуть'}" Click="MaximizeClick">
                         <Path x:Name="MaximizeGlyph" Data="M 0,0 H 9 V 9 H 0 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
-                    <Button Style="{StaticResource CloseTitleButton}" ToolTip="Свернуть в трей"
-                            AutomationProperties.Name="Свернуть в трей" Click="CloseClick">
+                    <Button Style="{StaticResource CloseTitleButton}" ToolTip="{DynamicResource 'UI:Свернуть в трей'}"
+                            AutomationProperties.Name="{DynamicResource 'UI:Свернуть в трей'}" Click="CloseClick">
                         <Path Data="M 0,0 L 9,9 M 9,0 L 0,9" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
                 </StackPanel>
-            </DockPanel>
+            </Grid>
         </Border>
 
-        <Border x:Name="UpdateBanner" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource Panel}"
-                BorderBrush="{StaticResource Accent}" BorderThickness="0,0,0,1" Padding="20,10">
+        <Border x:Name="UpdateBanner" Grid.Row="1" Visibility="Collapsed" Background="{DynamicResource Panel}"
+                BorderBrush="{DynamicResource Accent}" BorderThickness="0,0,0,1" Padding="20,10">
             <DockPanel>
-                <Button x:Name="InstallUpdateButton" DockPanel.Dock="Right" Content="Установить"
+                <Button x:Name="InstallUpdateButton" DockPanel.Dock="Right" Content="{DynamicResource 'UI:Установить'}"
                         Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Margin="16,0,0,0"
                         Click="InstallUpdateClick" />
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Вышла новая версия приложения" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource 'UI:Вышла новая версия приложения'}" FontWeight="SemiBold" />
                     <TextBlock x:Name="UpdateStatus" Style="{StaticResource SecondaryText}" Margin="0,3,0,0"
                                AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
@@ -87,185 +149,269 @@
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="204" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="205" />
+                <ColumnDefinition />
             </Grid.ColumnDefinitions>
-            <Border Background="{StaticResource Rail}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
-                <DockPanel Margin="15,23,15,20">
-                    <Border DockPanel.Dock="Bottom" Background="#1B1D25" BorderBrush="{StaticResource Line}"
-                            BorderThickness="1" CornerRadius="10" Padding="11,10">
-                        <StackPanel>
-                            <TextBlock x:Name="AppVersionText" FontSize="12" FontWeight="SemiBold" />
-                            <Button Content="Что нового?" Click="ShowReleaseNotesClick" Margin="0,7,0,0"
-                                    Padding="9,4" MinHeight="28" FontSize="12" />
-                        </StackPanel>
-                    </Border>
+            <Border Grid.Column="0" Background="{DynamicResource GlassRail}" BorderBrush="{DynamicResource Line}"
+                    BorderThickness="0,0,1,0" Padding="10,16,10,10">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
-                        <RadioButton x:Name="OverviewNav" Content="Обзор" Tag="{StaticResource OverviewIcon}"
-                                     GroupName="Navigation" IsChecked="True" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="PcInfoNav" Content="О компьютере" Tag="{StaticResource PcInfoIcon}"
+                        <TextBlock Text="{DynamicResource 'UI:Система'}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="9,8,0,7" />
+                        <RadioButton x:Name="OverviewNav" Content="{DynamicResource 'UI:Обзор'}" Tag="{StaticResource OverviewIcon}"
+                                     IsChecked="True" GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <RadioButton x:Name="PcInfoNav" Content="{DynamicResource 'UI:О компьютере'}" Tag="{StaticResource PcInfoIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="MemoryNav" Content="Память" Tag="{StaticResource MemoryIcon}"
+                        <RadioButton x:Name="MemoryNav" Content="{DynamicResource 'UI:Память'}" Tag="{StaticResource MemoryIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="CleanNav" Content="Очистка" Tag="{StaticResource CleanIcon}"
+                        <TextBlock Text="{DynamicResource 'UI:Обслуживание'}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="9,8,0,7" />
+                        <RadioButton x:Name="CleanNav" Content="{DynamicResource 'UI:Очистка'}" Tag="{StaticResource CleanIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="TweaksNav" Content="Оптимизация" Tag="{StaticResource TweaksIcon}"
+                        <RadioButton x:Name="TweaksNav" Content="{DynamicResource 'UI:Оптимизация'}" Tag="{StaticResource TweaksIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="PrivacyNav" Content="Персонализация" Tag="{StaticResource PrivacyIcon}" ToolTip="Персонализация и приватность"
+                        <RadioButton x:Name="PackagesNav" Content="{DynamicResource 'UI:UWP-приложения'}" Tag="{StaticResource PackagesIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
-                        <RadioButton x:Name="ProfileNav" Content="Профиль фокуса" Tag="{StaticResource FocusIcon}"
+                        <RadioButton x:Name="PersonalizationNav" Content="{DynamicResource 'UI:Персонализация'}" Tag="{StaticResource SettingsIcon}"
+                                     GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <RadioButton x:Name="PrivacyNav" Content="{DynamicResource 'UI:Телеметрия'}" Tag="{StaticResource PrivacyIcon}"
+                                     GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <TextBlock Text="{DynamicResource 'UI:Сеансы'}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="9,8,0,7" />
+                        <RadioButton x:Name="ProfileNav" Content="{DynamicResource 'UI:Профиль фокуса'}" Tag="{StaticResource FocusIcon}"
+                                     GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
+                        <RadioButton x:Name="SnapshotsNav" Content="{DynamicResource 'UI:До и после'}" Tag="{StaticResource SnapshotIcon}"
                                      GroupName="Navigation" Style="{StaticResource NavButton}" Checked="Navigate" />
                     </StackPanel>
-                </DockPanel>
+                </ScrollViewer>
             </Border>
-
             <ScrollViewer x:Name="PageScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid Margin="30,23,30,26">
-                    <StackPanel x:Name="OverviewPage">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Обзор системы" />
-                        <TextBlock x:Name="RefreshStatus" Style="{StaticResource SecondaryText}" Margin="0,4,0,17"
-                                   Text="Получаем данные Windows…" />
+            <Grid x:Name="PageContent" Margin="28,22,28,24" MaxWidth="1490">
+                <StackPanel x:Name="OverviewPage">
+                    <DockPanel Margin="0,0,0,14">
+                        <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0">
+                            <Button x:Name="RefreshComponentsButton" Content="{DynamicResource 'UI:Обновить'}"
+                                    AutomationProperties.Name="{DynamicResource 'UI:Обновить компоненты'}" Click="RefreshComponentsClick" Margin="0,0,8,0" />
+                            <Button Content="{DynamicResource 'UI:До и после'}" Click="OpenSnapshotsClick" />
+                        </WrapPanel>
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource 'UI:Обзор системы'}" Style="{StaticResource PageTitle}" />
+                            <WrapPanel Margin="0,4,0,0">
+                                <TextBlock x:Name="HostNameText" Foreground="{DynamicResource Accent}" FontWeight="SemiBold"
+                                           Margin="0,0,9,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ComponentWindows" Style="{StaticResource SecondaryText}"
+                                           Margin="0,0,10,0" VerticalAlignment="Center" />
+                                <Border Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Line}"
+                                        BorderThickness="1" Padding="8,3" CornerRadius="6" Margin="0,2,0,0">
+                                    <TextBlock x:Name="RefreshStatus" Text="{DynamicResource 'UI:Получаем данные Windows…'}"
+                                               Foreground="{DynamicResource Text}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                </Border>
+                            </WrapPanel>
+                        </StackPanel>
+                    </DockPanel>
 
-                        <Border Style="{StaticResource Card}" Padding="0" MinHeight="219">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#182322" Offset="0" />
-                                    <GradientStop Color="#1B2429" Offset=".51" />
-                                    <GradientStop Color="#212035" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
+                    <UniformGrid Columns="3" Margin="0,0,-10,13">
+                        <Border Style="{StaticResource ComponentTile}" Margin="0,0,10,0" Padding="14"
+                                MouseEnter="DashboardCardEnter" MouseMove="DashboardCardMove" MouseLeave="DashboardCardLeave"
+                                IsVisibleChanged="DashboardCardVisibilityChanged">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource 'UI:Загрузка процессора'}" Style="{StaticResource SecondaryText}" />
+                                <TextBlock x:Name="CpuLoadText" Text="—" Style="{StaticResource MetricValue}" Margin="0,1,0,4" />
+                                <Border Height="43" BorderBrush="{DynamicResource HeroGrid}" BorderThickness="0,1,0,1">
+                                    <Canvas x:Name="CpuTrendPlot" SizeChanged="CpuTrendSizeChanged" ClipToBounds="True">
+                                        <Path x:Name="CpuTrendLine" Stroke="{DynamicResource Accent}" StrokeThickness="1.7" StrokeLineJoin="Round" />
+                                    </Canvas>
+                                </Border>
+                                <TextBlock Text="{DynamicResource 'UI:История нагрузки'}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource ComponentTile}" Margin="0,0,10,0" Padding="14"
+                                MouseEnter="DashboardCardEnter" MouseMove="DashboardCardMove" MouseLeave="DashboardCardLeave"
+                                IsVisibleChanged="DashboardCardVisibilityChanged">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource 'UI:Оперативная память'}" Style="{StaticResource SecondaryText}" />
+                                <TextBlock x:Name="RamPercent" Text="—" Style="{StaticResource MetricValue}" Margin="0,1,0,4" />
+                                <Border Height="43" BorderBrush="{DynamicResource HeroGrid}" BorderThickness="0,1,0,1">
+                                    <Canvas x:Name="RamTrendPlot" SizeChanged="RamTrendSizeChanged" ClipToBounds="True">
+                                        <Path x:Name="RamTrendLine" Stroke="{DynamicResource Violet}" StrokeThickness="1.7" StrokeLineJoin="Round" />
+                                    </Canvas>
+                                </Border>
+                                <TextBlock x:Name="RamUsage" Text="—" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,0" />
+                                <TextBlock x:Name="RamAvailable" Style="{StaticResource SecondaryText}" FontSize="12" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource ComponentTile}" Margin="0,0,10,0" Padding="14"
+                                MouseEnter="DashboardCardEnter" MouseMove="DashboardCardMove" MouseLeave="DashboardCardLeave"
+                                IsVisibleChanged="DashboardCardVisibilityChanged">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource 'UI:Свободно на диске Windows'}" Style="{StaticResource SecondaryText}" />
+                                <TextBlock x:Name="SystemDiskFreeText" Text="—" Style="{StaticResource MetricValue}" TextWrapping="Wrap" Margin="0,1,0,8" />
+                                <ProgressBar x:Name="SystemDiskMeter" Style="{StaticResource MemoryUsageMeter}" Maximum="100" Margin="0,5,0,9" />
+                                <TextBlock x:Name="SystemDiskVolumeText" Text="—" Style="{StaticResource SecondaryText}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <Border Style="{StaticResource Card}" Padding="15">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,12">
+                                <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0">
+                                    <Button x:Name="BoardResetButton" Content="{DynamicResource 'UI:Сбросить вид'}" Click="ResetBoardClick"
+                                            Visibility="Collapsed" Margin="0,0,7,0" />
+                                    <Button x:Name="BoardModeToggle" Content="{DynamicResource 'UI:Открыть 3D'}" Click="ToggleBoardClick" />
+                                </WrapPanel>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource 'UI:Схема компьютера'}" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="BoardHint" Text="{DynamicResource 'UI:Выберите компонент, чтобы увидеть показания.'}"
+                                               Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,3,0,0" />
+                                </StackPanel>
+                            </DockPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="248" />
+                                    <ColumnDefinition Width="1.6*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" MinWidth="178" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Margin="23,20,8,20" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Path Data="{StaticResource MemoryIcon}" Stroke="{StaticResource Accent}" Width="17" Height="17"
-                                              StrokeThickness="1.4" Stretch="Uniform" Margin="0,0,8,0" />
-                                        <TextBlock Text="Оперативная память" Style="{StaticResource SectionTitle}" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="RamPercent" Text="—" FontFamily="Cascadia Mono, Consolas"
-                                               Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="53" Margin="-3,0,0,2" />
-                                    <TextBlock x:Name="RamUsage" Text="Чтение показателей памяти" Foreground="{StaticResource Text}" FontSize="14" />
-                                    <TextBlock x:Name="RamAvailable" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
-                                </StackPanel>
-                                <Border Grid.Column="1" CornerRadius="0,13,13,0">
-                                    <Border.Background>
-                                        <DrawingBrush TileMode="Tile" Viewport="0,0,19,19" ViewportUnits="Absolute"
-                                                      Viewbox="0,0,19,19" ViewboxUnits="Absolute">
-                                            <DrawingBrush.Drawing>
-                                                <GeometryDrawing Brush="#22BCB1EF" Geometry="M 1,0 A 1,1 0 1 1 0,1 A 1,1 0 0 1 1,0" />
-                                            </DrawingBrush.Drawing>
-                                        </DrawingBrush>
-                                    </Border.Background>
-                                    <Grid Width="170" Height="170" IsHitTestVisible="False">
-                                        <Ellipse Stroke="#596075" StrokeThickness="1" StrokeDashArray="1 4" />
-                                        <Ellipse Margin="11" Stroke="#383D4E" StrokeThickness="8" />
-                                        <Path x:Name="RamGauge" Stroke="{StaticResource Accent}" StrokeThickness="8"
-                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                        <Ellipse Margin="27" Stroke="#45495B" StrokeThickness="1" />
-                                        <Border Width="60" Height="60" Background="#30343E" CornerRadius="16">
-                                            <Path Data="{StaticResource MemoryIcon}" Stroke="{StaticResource Accent}" StrokeThickness="1.35"
-                                                  Width="29" Height="29" Stretch="Uniform" />
-                                        </Border>
+                                <Border Background="{DynamicResource BoardSurface}" BorderBrush="{DynamicResource Line}"
+                                        BorderThickness="1" CornerRadius="11" ClipToBounds="True" MinHeight="202">
+                                    <Grid>
+                                        <Path Stretch="Fill" Margin="14" Stroke="{DynamicResource CircuitTrace}" StrokeThickness="1"
+                                              IsHitTestVisible="False" Data="M 0,2 H 16 L 30,16 H 80 M 0,8 H 13 L 27,22 H 82 M 100,19 H 93 L 78,34 H 56 M 100,25 H 96 L 81,40 H 61 M 0,68 H 34 L 44,58 H 71" />
+                                        <Grid x:Name="BoardPlan" Margin="11">
+                                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <RadioButton x:Name="BoardCpu" Tag="Cpu" GroupName="BoardParts" Style="{StaticResource BoardPartButton}"
+                                                         Checked="BoardPartChecked" Margin="0,0,6,6" IsChecked="True"
+                                                         AutomationProperties.Name="{DynamicResource 'UI:Процессор'}">
+                                                <StackPanel>
+                                                    <Path Data="{StaticResource BoardCpuIcon}" Style="{StaticResource BoardPartIcon}" />
+                                                    <TextBlock Text="{DynamicResource 'UI:Процессор'}" Style="{StaticResource BoardPartLabel}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton x:Name="BoardMemory" Grid.Column="1" Tag="Memory" GroupName="BoardParts"
+                                                         Style="{StaticResource BoardPartButton}" Checked="BoardPartChecked" Margin="6,0,0,6"
+                                                         AutomationProperties.Name="{DynamicResource 'UI:Память'}">
+                                                <StackPanel>
+                                                    <Path Data="{StaticResource BoardMemoryIcon}" Style="{StaticResource BoardPartIcon}" />
+                                                    <TextBlock Text="{DynamicResource 'UI:Память'}" Style="{StaticResource BoardPartLabel}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton x:Name="BoardGraphics" Grid.Row="1" Tag="Graphics" GroupName="BoardParts"
+                                                         Style="{StaticResource BoardPartButton}" Checked="BoardPartChecked" Margin="0,6,6,0"
+                                                         MouseEnter="BoardGraphicsEnter" MouseLeave="BoardGraphicsLeave" IsVisibleChanged="BoardGraphicsVisibilityChanged"
+                                                         AutomationProperties.Name="{DynamicResource 'UI:Видеокарта'}">
+                                                <StackPanel>
+                                                    <Grid HorizontalAlignment="Center">
+                                                        <Path Data="{StaticResource BoardGpuIcon}" Style="{StaticResource BoardPartIcon}" />
+                                                        <Path Data="{StaticResource BoardFanIcon}" Style="{StaticResource BoardPartIcon}" Width="11" Height="11"
+                                                              StrokeThickness=".9" Margin="7,0,0,3" HorizontalAlignment="Left" RenderTransformOrigin=".5,.5">
+                                                            <Path.RenderTransform><RotateTransform x:Name="GraphicsFanRotation" /></Path.RenderTransform>
+                                                        </Path>
+                                                    </Grid>
+                                                    <TextBlock Text="{DynamicResource 'UI:Видеокарта'}" Style="{StaticResource BoardPartLabel}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton x:Name="BoardStorage" Grid.Row="1" Grid.Column="1" Tag="Storage" GroupName="BoardParts"
+                                                         Style="{StaticResource BoardPartButton}" Checked="BoardPartChecked" Margin="6,6,0,0"
+                                                         AutomationProperties.Name="{DynamicResource 'UI:Накопитель'}">
+                                                <StackPanel>
+                                                    <Path Data="{StaticResource BoardStorageIcon}" Style="{StaticResource BoardPartIcon}" />
+                                                    <TextBlock Text="{DynamicResource 'UI:Накопитель'}" Style="{StaticResource BoardPartLabel}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                        </Grid>
+                                        <Border x:Name="BoardHost" Height="236" Visibility="Collapsed" Background="Transparent"
+                                                AutomationProperties.Name="{DynamicResource 'UI:Интерактивная схема компьютера'}" />
                                     </Grid>
                                 </Border>
+                                <Border Grid.Column="2" Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Line}"
+                                        BorderThickness="1" CornerRadius="11" Padding="12">
+                                    <StackPanel>
+                                        <TextBlock x:Name="BoardSelectionLabel" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="BoardSelectionName" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,6" />
+                                        <TextBlock x:Name="BoardSelectionReading" Style="{StaticResource MetricValue}" Foreground="{DynamicResource Accent}" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="BoardSelectionDetail" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,6,0,11" />
+                                        <Button Content="{DynamicResource 'UI:Подробнее'}" Click="OpenBoardDetailsClick" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
-                        </Border>
+                            <WrapPanel x:Name="BoardKeys" Visibility="Collapsed" Margin="0,9,0,0">
+                                <Button Content="{DynamicResource 'UI:Процессор'}" Tag="Cpu" Click="BoardKeyClick" Margin="0,0,6,3" />
+                                <Button Content="{DynamicResource 'UI:Видеокарта'}" Tag="Graphics" Click="BoardKeyClick" Margin="0,0,6,3" />
+                                <Button Content="{DynamicResource 'UI:Память'}" Tag="Memory" Click="BoardKeyClick" Margin="0,0,6,3" />
+                                <Button Content="{DynamicResource 'UI:Накопитель'}" Tag="Storage" Click="BoardKeyClick" Margin="0,0,6,3" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
 
-                        <Grid Margin="0,14,0,14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource Card}" Padding="16,13">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="Пик выделенной памяти" />
-                                    <TextBlock x:Name="CommitPeak" Text="—" Style="{StaticResource MetricValue}" Margin="0,6,0,2" />
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="С последней загрузки" FontSize="11" />
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,13">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="Лимит выделения" />
-                                    <TextBlock x:Name="CommitLimit" Text="—" Style="{StaticResource MetricValue}" Margin="0,6,0,2" />
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="Текущий лимит Windows" FontSize="11" />
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,13">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="Файл подкачки" />
-                                    <TextBlock x:Name="PagefileCurrent" Text="—" Style="{StaticResource MetricValue}" Margin="0,6,0,2" />
-                                    <TextBlock Style="{StaticResource SecondaryText}" Text="Используется сейчас" FontSize="11" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="3*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="2*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource Card}" Padding="16">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Файлы подкачки" />
-                                    <TextBlock x:Name="PagefileDetail" Style="{StaticResource SecondaryText}" Margin="0,9,0,0"
-                                               Text="Получаем список файлов…" />
-                                    <ItemsControl x:Name="PagefileItems" Margin="0,9,0,0">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,8,0,2">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                                                        <TextBlock Text="{Binding Usage}" Style="{StaticResource SecondaryText}" FontSize="11" Margin="0,3,0,0" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Быстрые действия" />
-                                    <Button Margin="0,9,0,6" Click="OpenCleanClick" HorizontalContentAlignment="Stretch">
-                                        <DockPanel>
-                                            <Path DockPanel.Dock="Right" Data="{StaticResource ArrowIcon}" Stroke="{StaticResource Accent}"
-                                                  StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" Margin="12,0,0,0" />
-                                            <TextBlock Text="Открыть очистку" />
-                                        </DockPanel>
-                                    </Button>
-                                    <Button Click="OpenProfileClick" HorizontalContentAlignment="Stretch">
-                                        <DockPanel>
-                                            <Path DockPanel.Dock="Right" Data="{StaticResource ArrowIcon}" Stroke="{StaticResource Violet}"
-                                                  StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" Margin="12,0,0,0" />
-                                            <TextBlock Text="Открыть профиль фокуса" />
-                                        </DockPanel>
-                                    </Button>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
+                    <WrapPanel Margin="0,12,0,12" HorizontalAlignment="Right">
+                        <Button x:Name="OverviewFocusButton" Content="{DynamicResource 'UI:Открыть профиль фокуса'}"
+                                Click="OpenProfileClick" Margin="0,0,8,0" />
+                        <Button Content="{DynamicResource 'UI:Открыть очистку'}" Click="OpenCleanClick" />
+                    </WrapPanel>
+                    <Border Style="{StaticResource Card}">
+                        <Expander x:Name="OverviewDetails" Style="{StaticResource DetailsExpander}"
+                                  Header="{DynamicResource 'UI:Система, сеть и подкачка'}" Expanded="OverviewDetailsExpanded">
+                            <StackPanel Margin="0,6,0,0">
+                                <UniformGrid Columns="3" Margin="0,0,0,12">
+                                    <StackPanel Margin="0,0,6,0">
+                                        <TextBlock Text="{DynamicResource 'UI:Мониторы'}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="ComponentDisplay" Text="—" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ComponentDisplayDetail" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,6,0">
+                                        <TextBlock Text="{DynamicResource 'UI:Сеть'}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="ComponentNetwork" Text="—" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ComponentNetworkDetail" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock x:Name="ComponentPower" Text="—" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ComponentPowerDetail" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="ComponentUptime" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <UniformGrid Columns="3" Margin="0,5,0,9">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource 'UI:Пик выделенной памяти'}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="CommitPeak" Text="—" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource 'UI:Лимит выделения'}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="CommitLimit" Text="—" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource 'UI:Файл подкачки'}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                        <TextBlock x:Name="PagefileCurrent" Text="—" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock x:Name="PagefileDetail" Style="{StaticResource SecondaryText}" />
+                                <ItemsControl x:Name="PagefileItems">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,5,0,3">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Usage}" Style="{StaticResource SecondaryText}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Expander>
+                    </Border>
+                </StackPanel>
 
                     <StackPanel x:Name="PcInfoPage" Visibility="Collapsed">
-                        <DockPanel Margin="0,0,0,17">
+                        <DockPanel x:Name="PcInfoHeader" Margin="0,0,0,17">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                                <Button x:Name="PcInfoRefreshButton" Content="Обновить" Click="RefreshPcInfoClick" Margin="0,0,8,0" />
-                                <Button x:Name="PcInfoCopyButton" Content="Скопировать отчёт" Click="CopyPcInfoClick" IsEnabled="False" />
+                                <Button x:Name="PcInfoRefreshButton" Content="{DynamicResource 'UI:Обновить'}" Click="RefreshPcInfoClick" Margin="0,0,8,0" />
+                                <Button Content="{DynamicResource 'UI:Развернуть или свернуть всё'}" Click="ExpandPcInfoClick" Margin="0,0,8,0" />
+                                <Button x:Name="PcInfoCopyButton" Content="{DynamicResource 'UI:Скопировать отчёт'}" Click="CopyPcInfoClick" IsEnabled="False" />
                             </StackPanel>
-                            <TextBlock Style="{StaticResource PageTitle}" Text="О компьютере" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:О компьютере'}" TextWrapping="Wrap" VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock x:Name="PcInfoStatus" Style="{StaticResource SecondaryText}" FontSize="14" Margin="0,0,0,12" Visibility="Collapsed"
-                                   Text="Получаем сведения о компьютере…" AutomationProperties.LiveSetting="Polite" />
+                                   Text="{DynamicResource 'UI:Получаем сведения о компьютере…'}" AutomationProperties.LiveSetting="Polite" />
                         <ItemsControl x:Name="PcInfoSummary" Margin="0,0,-12,4">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="2" />
+                                    <UniformGrid Columns="3" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -301,7 +447,7 @@
                                             <ItemsControl ItemsSource="{Binding Rows}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,7">
+                                                        <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,7">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="205" />
@@ -312,7 +458,7 @@
                                                                         <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
                                                                             <Style.Triggers>
                                                                                 <DataTrigger Binding="{Binding IsGroup}" Value="True">
-                                                                                    <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                                                    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
                                                                                     <Setter Property="FontWeight" Value="SemiBold" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
@@ -334,27 +480,31 @@
                     </StackPanel>
 
                     <StackPanel x:Name="MemoryPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Память" Margin="0,0,0,17" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Память'}" Margin="0,0,0,17" />
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <UniformGrid Columns="3">
                                     <StackPanel Margin="0,0,12,0">
-                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Доступно ОЗУ" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Доступно ОЗУ'}" />
                                         <TextBlock x:Name="DiagnosticRam" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <StackPanel Margin="0,0,12,0">
-                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Выделено Windows" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Выделено Windows'}" />
                                         <TextBlock x:Name="DiagnosticCommit" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Запас до лимита" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Запас до лимита'}" />
                                         <TextBlock x:Name="DiagnosticHeadroom" Style="{StaticResource MetricValue}" Text="—" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </UniformGrid>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="История за 15 минут" Margin="0,18,0,8" />
+                                <WrapPanel Margin="0,9,0,0">
+                                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Системный кэш'}" Margin="0,0,8,0" />
+                                    <TextBlock x:Name="DiagnosticSystemCache" Text="—" FontWeight="SemiBold" />
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:История за 15 минут'}" Margin="0,18,0,8" />
                                 <WrapPanel Margin="0,0,0,8">
-                                    <TextBlock Text="●  Занято ОЗУ" Foreground="{StaticResource Accent}" Margin="0,0,16,0" />
-                                    <TextBlock Text="●  Выделено от текущего лимита" Foreground="{StaticResource Violet}" />
+                                    <TextBlock Text="{DynamicResource 'UI:●  Занято ОЗУ'}" Foreground="{DynamicResource Accent}" Margin="0,0,16,0" />
+                                    <TextBlock Text="{DynamicResource 'UI:●  Выделено от текущего лимита'}" Foreground="{DynamicResource Violet}" />
                                 </WrapPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -365,54 +515,54 @@
                                         <RowDefinition Height="106" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Grid Margin="0,0,8,0">
+                                    <Grid x:Name="MemoryHistoryAxis" Margin="0,0,8,0">
                                         <TextBlock Style="{StaticResource SecondaryText}" Text="100%" VerticalAlignment="Top" />
                                         <TextBlock Style="{StaticResource SecondaryText}" Text="50%" VerticalAlignment="Center" />
                                         <TextBlock Style="{StaticResource SecondaryText}" Text="0%" VerticalAlignment="Bottom" />
                                     </Grid>
-                                    <Grid Grid.Column="1" Background="{StaticResource Canvas}" AutomationProperties.Name="История загрузки памяти">
-                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1" />
-                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" VerticalAlignment="Center" />
+                                    <Grid x:Name="MemoryHistoryPanel" Grid.Column="1" Background="{DynamicResource Canvas}" AutomationProperties.Name="{DynamicResource 'UI:История загрузки памяти'}">
+                                        <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1" />
+                                        <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" VerticalAlignment="Center" />
                                         <Canvas x:Name="MemoryHistoryPlot" ClipToBounds="True" SizeChanged="MemoryHistorySizeChanged">
-                                            <Path x:Name="RamHistoryLine" Stroke="{StaticResource Accent}" StrokeThickness="2" />
-                                            <Path x:Name="CommitHistoryLine" Stroke="{StaticResource Violet}" StrokeThickness="2" StrokeDashArray="3,2" />
+                                            <Path x:Name="RamHistoryLine" Stroke="{DynamicResource Accent}" StrokeThickness="2" />
+                                            <Path x:Name="CommitHistoryLine" Stroke="{DynamicResource Violet}" StrokeThickness="2" StrokeDashArray="3,2" />
                                         </Canvas>
                                         <TextBlock x:Name="MemoryHistoryStatus" Style="{StaticResource SecondaryText}"
-                                                   Text="Собираем первые замеры…" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" />
+                                                   Text="{DynamicResource 'UI:Собираем первые замеры…'}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" />
                                     </Grid>
-                                    <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,5,0,0">
-                                        <TextBlock Style="{StaticResource SecondaryText}" Text="Сейчас" DockPanel.Dock="Right" />
-                                        <TextBlock Style="{StaticResource SecondaryText}" Text="15 минут назад" />
+                                    <DockPanel x:Name="MemoryHistoryTimes" Grid.Row="1" Grid.Column="1" Margin="0,5,0,0">
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Сейчас'}" DockPanel.Dock="Right" />
+                                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:15 минут назад'}" />
                                     </DockPanel>
                                 </Grid>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Приложения и процессы" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Приложения и процессы'}" />
                                 <Grid Margin="0,12,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition />
                                         <ColumnDefinition Width="224" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,12,0">
-                                        <Label Content="Имя процесса или PID" Target="{Binding ElementName=MemoryProcessSearch}"
-                                               Foreground="{StaticResource Muted}" Padding="0,0,0,5" />
+                                        <Label Content="{DynamicResource 'UI:Имя процесса или PID'}" Target="{Binding ElementName=MemoryProcessSearch}"
+                                               Foreground="{DynamicResource Muted}" Padding="0,0,0,5" />
                                         <TextBox x:Name="MemoryProcessSearch" TextChanged="MemoryProcessSearchChanged" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1">
-                                        <Label Content="Сортировка" Target="{Binding ElementName=MemoryProcessSort}"
-                                               Foreground="{StaticResource Muted}" Padding="0,0,0,5" />
+                                        <Label Content="{DynamicResource 'UI:Сортировка'}" Target="{Binding ElementName=MemoryProcessSort}"
+                                               Foreground="{DynamicResource Muted}" Padding="0,0,0,5" />
                                         <ComboBox x:Name="MemoryProcessSort" Style="{StaticResource DarkComboBox}"
                                                   SelectedIndex="0" SelectionChanged="MemoryProcessSortChanged">
-                                            <ComboBoxItem Content="По объёму ОЗУ" />
-                                            <ComboBoxItem Content="По приросту в ОЗУ" />
+                                            <ComboBoxItem Content="{DynamicResource 'UI:По объёму ОЗУ'}" />
+                                            <ComboBoxItem Content="{DynamicResource 'UI:По приросту в ОЗУ'}" />
                                         </ComboBox>
                                     </StackPanel>
                                 </Grid>
-                                <Border BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Background="{StaticResource Canvas}">
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8" Background="{DynamicResource Canvas}">
                                     <StackPanel Grid.IsSharedSizeScope="True">
-                                        <Border Background="{StaticResource Raised}" BorderBrush="{StaticResource Line}"
+                                        <Border Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Line}"
                                                 BorderThickness="0,0,0,1" CornerRadius="7,7,0,0" Padding="12,8,25,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -421,17 +571,17 @@
                                                     <ColumnDefinition Width="98" SharedSizeGroup="WorkingSetColumn" />
                                                     <ColumnDefinition Width="118" SharedSizeGroup="GrowthColumn" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Style="{StaticResource SecondaryText}" Text="Процесс" />
+                                                <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Процесс'}" />
                                                 <TextBlock Grid.Column="1" Style="{StaticResource SecondaryText}" Text="PID" TextAlignment="Right" />
-                                                <TextBlock Grid.Column="2" Style="{StaticResource SecondaryText}" Text="В ОЗУ" TextAlignment="Right" />
-                                                <TextBlock Grid.Column="3" Style="{StaticResource SecondaryText}" Text="Изм. за 2 мин" TextAlignment="Right" />
+                                                <TextBlock Grid.Column="2" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:В ОЗУ'}" TextAlignment="Right" />
+                                                <TextBlock Grid.Column="3" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Изм. за 2 мин'}" TextAlignment="Right" />
                                             </Grid>
                                         </Border>
                                         <Grid>
                                             <ListBox x:Name="MemoryProcesses" MaxHeight="234" MinHeight="44" Background="Transparent"
-                                                     BorderThickness="0" Padding="0" Foreground="{StaticResource Text}"
+                                                     BorderThickness="0" Padding="0" Foreground="{DynamicResource Text}"
                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Visible"
-                                                     AutomationProperties.Name="Процессы и использование ОЗУ" SelectionChanged="MemoryProcessSelectionChanged">
+                                                     AutomationProperties.Name="{DynamicResource 'UI:Процессы и использование ОЗУ'}" SelectionChanged="MemoryProcessSelectionChanged">
                                                 <ListBox.ItemContainerStyle>
                                                     <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                                                         <Setter Property="Padding" Value="12,7" />
@@ -447,30 +597,30 @@
                                                                 <ColumnDefinition SharedSizeGroup="GrowthColumn" />
                                                             </Grid.ColumnDefinitions>
                                                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" Margin="0,0,8,0" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Pid}" Foreground="{StaticResource Muted}" TextAlignment="Right" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Pid}" Foreground="{DynamicResource Muted}" TextAlignment="Right" />
                                                             <TextBlock Grid.Column="2" Text="{Binding WorkingSet}" FontFamily="Cascadia Mono, Consolas" TextAlignment="Right" />
                                                             <TextBlock Grid.Column="3" Text="{Binding Growth}" FontFamily="Cascadia Mono, Consolas" TextAlignment="Right" />
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ListBox.ItemTemplate>
                                             </ListBox>
-                                            <TextBlock x:Name="MemoryProcessNoMatches" Text="Процессы не найдены" Visibility="Collapsed"
+                                            <TextBlock x:Name="MemoryProcessNoMatches" Text="{DynamicResource 'UI:Процессы не найдены'}" Visibility="Collapsed"
                                                        Style="{StaticResource SecondaryText}" Margin="12,8"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
                                                        AutomationProperties.LiveSetting="Polite" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
-                                <TextBlock x:Name="MemoryProcessStatus" Style="{StaticResource SecondaryText}" Text="Получаем список процессов…" Margin="0,8,0,0" />
-                                <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                <TextBlock x:Name="MemoryProcessStatus" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Получаем список процессов…'}" Margin="0,8,0,0" />
+                                <Border Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
                                         CornerRadius="8" Padding="12" Margin="0,12,0,0">
                                     <StackPanel>
                                         <DockPanel>
-                                            <Button x:Name="TrimButton" Content="Сбросить рабочий набор" IsEnabled="False" Click="TrimClick"
+                                            <Button x:Name="TrimButton" Content="{DynamicResource 'UI:Сбросить рабочий набор'}" IsEnabled="False" Click="TrimClick"
                                                     DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock x:Name="MemoryProcessSelection" FontWeight="SemiBold" TextWrapping="Wrap"
-                                                           Text="Выберите процесс в таблице" />
+                                                           Text="{DynamicResource 'UI:Выберите процесс в таблице'}" />
                                                 <TextBlock x:Name="MemoryProcessActionHint" Style="{StaticResource SecondaryText}"
                                                            Margin="0,3,0,0" Visibility="Collapsed" />
                                             </StackPanel>
@@ -490,34 +640,47 @@
                                 </Border>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <Border x:Name="MemoryTrimGroup" Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Файл подкачки" />
-                                <TextBlock x:Name="PagefileMode" Style="{StaticResource SecondaryText}" Text="Читаем настройки Windows…" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Сброс ОЗУ для выбранных процессов'}" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Выбирайте процессы в таблице выше и добавляйте их в очередь. Windows может снова загрузить эти страницы.'}" />
+                                <TextBlock x:Name="MemoryTrimQueueText" Text="—" TextWrapping="Wrap" Margin="0,5,0,7" />
+                                <WrapPanel>
+                                    <Button x:Name="QueueMemoryProcessButton" Content="{DynamicResource 'UI:Добавить выбранный'}" IsEnabled="False" Click="QueueMemoryProcessClick" Margin="0,0,8,0" />
+                                    <Button x:Name="RunMemoryTrimQueueButton" Content="{DynamicResource 'UI:Сбросить очередь'}" IsEnabled="False" Click="TrimMemoryQueueClick" Margin="0,0,8,0" />
+                                    <Button x:Name="ClearMemoryTrimQueueButton" Content="{DynamicResource 'UI:Очистить список'}" IsEnabled="False" Click="ClearMemoryQueueClick" />
+                                </WrapPanel>
+                                <TextBlock x:Name="MemoryTrimQueueStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="MemoryPagefileCard" Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Файл подкачки'}" />
+                                <TextBlock x:Name="PagefileMode" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Читаем настройки Windows…'}" Margin="0,6,0,0" />
                                 <TextBlock x:Name="DiagnosticPagefileStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0" Visibility="Collapsed" />
                                 <ItemsControl x:Name="DiagnosticPagefiles">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
+                                            <Border Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}"
                                                     BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,10,0,0">
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                     <UniformGrid Columns="3" Margin="0,9,0,0">
                                                         <StackPanel Margin="0,0,10,0">
-                                                            <TextBlock Text="Занято / выделено" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{DynamicResource 'UI:Занято / выделено'}" Style="{StaticResource SecondaryText}" />
                                                             <TextBlock Text="{Binding Allocation}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
                                                         </StackPanel>
                                                         <StackPanel Margin="0,0,10,0">
-                                                            <TextBlock Text="Пик использования" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{DynamicResource 'UI:Пик использования'}" Style="{StaticResource SecondaryText}" />
                                                             <TextBlock Text="{Binding Peak}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
                                                         </StackPanel>
                                                         <StackPanel>
-                                                            <TextBlock Text="Свободно на диске" Style="{StaticResource SecondaryText}" />
+                                                            <TextBlock Text="{DynamicResource 'UI:Свободно на диске'}" Style="{StaticResource SecondaryText}" />
                                                             <TextBlock Text="{Binding FreeSpace}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0" />
                                                         </StackPanel>
                                                     </UniformGrid>
                                                     <ProgressBar Value="{Binding UsagePercent, Mode=OneWay}" Maximum="100" Margin="0,10,0,0"
-                                                                 AutomationProperties.Name="Использование выделенного файла подкачки">
+                                                                 AutomationProperties.Name="{DynamicResource 'UI:Использование выделенного файла подкачки'}">
                                                         <ProgressBar.Style>
                                                             <Style TargetType="ProgressBar" BasedOn="{StaticResource MemoryUsageMeter}">
                                                                 <Style.Triggers>
@@ -534,13 +697,13 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock x:Name="MemoryPressureStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,8,0,0" />
-                                <Expander Header="Оценка размера и системные дампы" Style="{StaticResource DetailsExpander}" Margin="0,12,0,0">
+                                <Expander Header="{DynamicResource 'UI:Оценка размера и системные дампы'}" Style="{StaticResource DetailsExpander}" Margin="0,12,0,0">
                                     <TextBlock x:Name="MemoryAdvice" Style="{StaticResource SecondaryText}" />
                                 </Expander>
                                 <DockPanel Margin="0,12,0,0">
-                                    <Button Content="Открыть параметры системы" Click="OpenPagefileSettingsClick" Margin="0,0,12,0" />
+                                    <Button Content="{DynamicResource 'UI:Открыть параметры системы'}" Click="OpenPagefileSettingsClick" Margin="0,0,12,0" />
                                     <TextBlock Style="{StaticResource SecondaryText}" VerticalAlignment="Center"
-                                               Text="Быстродействие → Параметры → Дополнительно → Виртуальная память" />
+                                               Text="{DynamicResource 'UI:Быстродействие → Параметры → Дополнительно → Виртуальная память'}" />
                                 </DockPanel>
                                 <TextBlock x:Name="PagefileSettingsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,6,0,0" />
                             </StackPanel>
@@ -548,37 +711,48 @@
                     </StackPanel>
 
                     <StackPanel x:Name="CleanPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Очистка Temp" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Перед удалением вы увидите список файлов. Занятые файлы пропускаются." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Очистка Temp'}" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Перед удалением вы увидите список файлов. Занятые файлы пропускаются.'}" Margin="0,4,0,17" />
+                        <Grid Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width=".85*" />
+                                <ColumnDefinition Width="15" />
+                                <ColumnDefinition Width="1.15*" />
+                            </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <UniformGrid x:Name="CleanCategoryChoices" Columns="2" Margin="-4,-4,-4,12">
+                            <StackPanel><TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Категории очистки'}" Margin="0,0,0,13" />
+                                <UniformGrid x:Name="CleanCategoryChoices" Columns="1" Margin="-4,-4,-4,12">
                                     <UniformGrid.Resources>
                                         <Style TargetType="CheckBox" BasedOn="{StaticResource CleanupOption}" />
                                     </UniformGrid.Resources>
-                                    <CheckBox x:Name="CleanTemp" Content="Папки Temp" IsChecked="True"
-                                              AutomationProperties.HelpText="Временные файлы Windows и приложений старше суток." />
-                                    <CheckBox x:Name="CleanThumbnails" Content="Миниатюры Проводника"
-                                              AutomationProperties.HelpText="Эскизы файлов. Проводник создаст их снова." />
-                                    <CheckBox x:Name="CleanIcons" Content="Кэш иконок"
-                                              AutomationProperties.HelpText="Сохранённые значки. Проводник создаст их снова." />
-                                    <CheckBox x:Name="CleanDirectX" Content="Кэш шейдеров DirectX"
-                                              AutomationProperties.HelpText="Кэш графики DirectX. Первый запуск игр может замедлиться." />
-                                    <CheckBox x:Name="CleanNvidia" Content="Кэш шейдеров NVIDIA"
-                                              AutomationProperties.HelpText="Кэш графики NVIDIA. Первый запуск игр может замедлиться." />
-                                    <CheckBox x:Name="CleanWerArchive" Content="Архив отчётов Windows"
-                                              AutomationProperties.HelpText="Сохранённые отчёты о сбоях старше 30 дней." />
-                                    <CheckBox x:Name="CleanWerQueue" Content="Очередь отчётов Windows"
-                                              AutomationProperties.HelpText="Отчёты старше 30 дней. Неотправленные будут потеряны." />
-                                    <CheckBox x:Name="CleanFontCache" Content="Кэш шрифтов"
-                                              AutomationProperties.HelpText="Для проблем со шрифтами." />
+                                    <CheckBox x:Name="CleanTemp" Content="{DynamicResource 'UI:Папки Temp'}" IsChecked="True"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Временные файлы Windows и приложений старше суток.'}" />
+                                    <CheckBox x:Name="CleanThumbnails" Content="{DynamicResource 'UI:Миниатюры Проводника'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Эскизы файлов. Проводник создаст их снова.'}" />
+                                    <CheckBox x:Name="CleanIcons" Content="{DynamicResource 'UI:Кэш иконок'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Сохранённые значки. Проводник создаст их снова.'}" />
+                                    <CheckBox x:Name="CleanDirectX" Content="{DynamicResource 'UI:Кэш шейдеров DirectX'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Кэш графики DirectX. Первый запуск игр может замедлиться.'}" />
+                                    <CheckBox x:Name="CleanNvidia" Content="{DynamicResource 'UI:Кэш шейдеров NVIDIA'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Кэш графики NVIDIA. Первый запуск игр может замедлиться.'}" />
+                                    <CheckBox x:Name="CleanWerArchive" Content="{DynamicResource 'UI:Архив отчётов Windows'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Сохранённые отчёты о сбоях старше 30 дней.'}" />
+                                    <CheckBox x:Name="CleanWerQueue" Content="{DynamicResource 'UI:Очередь отчётов Windows'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Отчёты старше 30 дней. Неотправленные будут потеряны.'}" />
+                                    <CheckBox x:Name="CleanFontCache" Content="{DynamicResource 'UI:Кэш шрифтов'}"
+                                              AutomationProperties.HelpText="{DynamicResource 'UI:Для проблем со шрифтами. Могут понадобиться права администратора.'}" />
                                 </UniformGrid>
                                 <WrapPanel>
-                                    <Button x:Name="ScanButton" Content="Сканировать" Style="{StaticResource PrimaryButton}" Click="ScanClick" Margin="0,0,8,0" />
-                                    <Button x:Name="DeleteButton" Content="Удалить найденное" IsEnabled="False" Click="DeleteClick" />
+                                    <Button x:Name="ScanButton" Content="{DynamicResource 'UI:Сканировать'}" Style="{StaticResource PrimaryButton}" Click="ScanClick" Margin="0,0,8,6" />
+                                    <Button x:Name="DeleteButton" Content="{DynamicResource 'UI:Удалить найденное'}" IsEnabled="False" Click="DeleteClick" />
                                 </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Предпросмотр очистки'}" />
                                 <TextBlock x:Name="CleanStatus" Style="{StaticResource SecondaryText}" Margin="0,13,0,0"
-                                           Text="Запустите сканирование, чтобы увидеть список файлов." AutomationProperties.LiveSetting="Polite" />
+                                           Text="{DynamicResource 'UI:Запустите сканирование, чтобы увидеть список файлов.'}" AutomationProperties.LiveSetting="Polite" />
                                 <ItemsControl x:Name="CleanDetails">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -591,9 +765,9 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <ListBox x:Name="CleanItems" Visibility="Collapsed" Height="290" Margin="0,13,0,0"
-                                         Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}"
+                                         Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.VirtualizationMode="Recycling"
-                                         AutomationProperties.Name="Файлы, доступные для очистки">
+                                         AutomationProperties.Name="{DynamicResource 'UI:Файлы, доступные для очистки'}">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Grid>
@@ -609,12 +783,13 @@
                                 </ListBox>
                             </StackPanel>
                         </Border>
+                        </Grid>
                         <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Файлы обновлений Windows" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Файлы обновлений Windows'}" />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,8,0,12"
-                                           Text="В параметрах хранилища откройте «Временные файлы» и выберите «Очистка обновлений Windows», если она доступна. Windows сама определяет, какие файлы обновлений можно удалить." />
-                                <Button Content="Открыть параметры хранилища" HorizontalAlignment="Left" Click="OpenWindowsStorageClick" />
+                                           Text="{DynamicResource 'UI:В параметрах хранилища откройте «Временные файлы» и выберите «Очистка обновлений Windows», если она доступна. Windows сама определяет, какие файлы обновлений можно удалить.'}" />
+                                <Button Content="{DynamicResource 'UI:Открыть параметры хранилища'}" HorizontalAlignment="Left" Click="OpenWindowsStorageClick" />
                                 <TextBlock x:Name="WindowsStorageStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
                                            Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
                             </StackPanel>
@@ -622,68 +797,47 @@
                     </StackPanel>
 
                     <StackPanel x:Name="TweaksPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Производительность" Margin="0,0,0,17" />
-                        <TextBlock x:Name="PerformanceSettingsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
-                                   Margin="0,0,0,10" AutomationProperties.LiveSetting="Polite" />
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Оптимизация'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Выберите задачу. В каждой группе показано, что меняется и где восстановить параметры.'}" Margin="0,5,0,12" />
+                    <TextBlock x:Name="PerformanceSettingsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,4,0,8" AutomationProperties.LiveSetting="Polite" />
+                    <TabControl x:Name="MaintenanceActions" Style="{StaticResource WorkspaceTabs}" SelectionChanged="MaintenanceTabChanged">
+                        <TabItem Header="{DynamicResource 'UI:Производительность'}"><StackPanel>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Игры и фоновая нагрузка'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Начните с автозагрузки, фоновых загрузок и настроек графики. Эффект можно проверить во вкладке «До и после».'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Открыть профиль фокуса'}" Click="OpenProfileClick" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:До и после'}" Click="OpenSnapshotsClick" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Игровой режим Windows'}" Click="OpenWindowsLinkClick" Tag="ms-settings:gaming-gamemode" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Экран и режим сна'}" Click="OpenWindowsLinkClick" Tag="ms-settings:powersleep" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Схемы электропитания'}" Click="OpenWindowsUtilityClick" Tag="powercfg.cpl" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border>
+                            <Border x:Name="HibernateCard" Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Гибернация и быстрый запуск'}" />
+                                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Отключение удаляет файл гибернации и отключает быстрый запуск. Включение снова создаёт файл на диске Windows.'}" Margin="0,5,0,11" />
+                                    <WrapPanel>
+                                        <Button Content="{DynamicResource 'UI:Проверить режимы сна'}" Click="RunMaintenanceClick" Tag="power-states" Margin="0,0,8,4" />
+                                        <Button Content="{DynamicResource 'UI:Включить гибернацию'}" Click="RunMaintenanceClick" Tag="hibernate-on" Margin="0,0,8,4" />
+                                        <Button Content="{DynamicResource 'UI:Отключить гибернацию'}" Click="RunMaintenanceClick" Tag="hibernate-off" Margin="0,0,8,4" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Увеличение файла подкачки" />
-                                <TextBlock x:Name="PagefileTweakState" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Лимит фоновой загрузки обновлений'}" />
+                                <TextBlock x:Name="DownloadLimitState" Foreground="{DynamicResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Увеличивает лимит выделяемой памяти. Для подкачки предпочтителен быстрый SSD с запасом свободного места. На HDD или медленном SSD частая подкачка ухудшает отзывчивость. Активная подкачка добавляет записи на SSD." />
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Ручной максимум ограничивает рост файла. После применения и восстановления нужна перезагрузка." />
+                                           Text="{DynamicResource 'UI:Освобождает часть интернет-канала для игр и звонков. Обновления могут скачиваться дольше. Лимит действует на загрузки через оптимизацию доставки, кроме загрузок от устройств в локальной сети.'}" />
                                 <WrapPanel Margin="0,10,0,0">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
-                                        <Label Content="Начальный, МиБ" Target="{Binding ElementName=PagefileInitialValue}"
-                                               Foreground="{StaticResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <TextBox x:Name="PagefileInitialValue" Width="84" MaxLength="10" IsEnabled="False" VerticalContentAlignment="Center" />
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
-                                        <Label Content="Максимальный, МиБ" Target="{Binding ElementName=PagefileMaximumValue}"
-                                               Foreground="{StaticResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <TextBox x:Name="PagefileMaximumValue" Width="84" MaxLength="10" IsEnabled="False" VerticalContentAlignment="Center" />
-                                    </StackPanel>
-                                </WrapPanel>
-                                <WrapPanel Margin="0,4,0,0">
-                                    <Button x:Name="ApplyPagefileButton" Content="Применить" Style="{StaticResource PrimaryButton}"
-                                            IsEnabled="False" Click="ApplyPagefileClick" Margin="0,0,8,0" />
-                                    <Button x:Name="RestorePagefileButton" Content="Восстановить" IsEnabled="False" Click="RestorePagefileClick" />
-                                </WrapPanel>
-                                <TextBlock x:Name="PagefileTweakStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
-                                           Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Оптимизация окон" />
-                                <TextBlock x:Name="WindowEffectsState" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Отключает прозрачность и системные анимации окон, меню и всплывающих подсказок для текущего пользователя. Некоторые приложения обновят оформление после повторного запуска или входа в Windows." />
-                                <WrapPanel Margin="0,10,0,0">
-                                    <Button x:Name="ApplyWindowEffectsButton" Content="Применить" Style="{StaticResource PrimaryButton}"
-                                            IsEnabled="False" Click="ApplyWindowEffectsClick" Margin="0,0,8,0" />
-                                    <Button x:Name="RestoreWindowEffectsButton" Content="Восстановить" IsEnabled="False" Click="RestoreWindowEffectsClick" />
-                                </WrapPanel>
-                                <TextBlock x:Name="WindowEffectsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
-                                           Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Лимит фоновой загрузки обновлений" />
-                                <TextBlock x:Name="DownloadLimitState" Foreground="{StaticResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
-                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Освобождает часть интернет-канала для игр и звонков. Обновления могут скачиваться дольше. Лимит действует на загрузки через оптимизацию доставки, кроме загрузок от устройств в локальной сети." />
-                                <WrapPanel Margin="0,10,0,0">
-                                    <Label Content="Лимит, % (1–100)" Target="{Binding ElementName=DownloadLimitValue}"
-                                           Foreground="{StaticResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <Label Content="{DynamicResource 'UI:Лимит, % (1–100)'}" Target="{Binding ElementName=DownloadLimitValue}"
+                                           Foreground="{DynamicResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <TextBox x:Name="DownloadLimitValue" Text="20" Width="62" MaxLength="3" IsEnabled="False"
                                              VerticalContentAlignment="Center" Margin="0,0,8,0" />
-                                    <Button x:Name="ApplyDownloadLimitButton" Content="Применить" Style="{StaticResource PrimaryButton}"
+                                    <Button x:Name="ApplyDownloadLimitButton" Content="{DynamicResource 'UI:Применить'}" Style="{StaticResource PrimaryButton}"
                                             IsEnabled="False" Click="ApplyDownloadLimitClick" Margin="0,0,8,0" />
-                                    <Button x:Name="RestoreDownloadLimitButton" Content="Восстановить" IsEnabled="False" Click="RestoreDownloadLimitClick" />
-                                    <Button Content="Параметры Windows" Tag="ms-settings:delivery-optimization-advanced"
+                                    <Button x:Name="RestoreDownloadLimitButton" Content="{DynamicResource 'UI:Восстановить'}" IsEnabled="False" Click="RestoreDownloadLimitClick" />
+                                    <Button Content="{DynamicResource 'UI:Параметры Windows'}" Tag="ms-settings:delivery-optimization-advanced"
                                             Click="OpenPerformanceSettingsClick" Margin="8,0,0,0" />
                                 </WrapPanel>
                                 <TextBlock x:Name="DownloadLimitStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
@@ -692,35 +846,35 @@
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Приложения в автозагрузке" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Приложения в автозагрузке'}" />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="В разделе «Автозагрузка приложений» Диспетчера задач видна оценка влияния на запуск. Там же можно отключить автозапуск выбранного приложения и позже включить его снова." />
+                                           Text="{DynamicResource 'UI:В разделе «Автозагрузка приложений» Диспетчера задач видна оценка влияния на запуск. Там же можно отключить автозапуск выбранного приложения и позже включить его снова.'}" />
                                 <WrapPanel Margin="0,10,0,0">
-                                    <Button Content="Открыть автозагрузку Windows" Click="OpenPerformanceSettingsClick" Tag="ms-settings:startupapps" Margin="0,0,8,0" />
-                                    <Button Content="Диспетчер задач" Click="OpenStartupImpactClick" />
+                                    <Button Content="{DynamicResource 'UI:Открыть автозагрузку Windows'}" Click="OpenPerformanceSettingsClick" Tag="ms-settings:startupapps" Margin="0,0,8,0" />
+                                    <Button Content="{DynamicResource 'UI:Диспетчер задач'}" Click="OpenStartupImpactClick" />
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Оптимизация оконных игр" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Оптимизация оконных игр'}" />
                                 <TextBlock x:Name="WindowedGamesHelp" Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Снижает задержку вывода кадра в совместимых играх DirectX 10 и 11 в оконном режиме и в окне без рамки. Включите оптимизацию в настройках графики и перезапустите игру." />
-                                <Button x:Name="WindowedGamesButton" Content="Открыть настройки графики Windows"
+                                           Text="{DynamicResource 'UI:Снижает задержку вывода кадра в совместимых играх DirectX 10 и 11 в оконном режиме и в окне без рамки. Включите оптимизацию в настройках графики и перезапустите игру.'}" />
+                                <Button x:Name="WindowedGamesButton" Content="{DynamicResource 'UI:Открыть настройки графики Windows'}"
                                         Tag="ms-settings:display-advancedgraphics" Click="OpenPerformanceSettingsClick" HorizontalAlignment="Left" Margin="0,10,0,0" />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Исключения из индексации" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Исключения из индексации'}" />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Исключите папки с часто меняющимися файлами, например кэшем или результатами сборки. Поиск по этим папкам может стать медленнее. Уже настроенные правила для вложенных папок сохраняются." />
+                                           Text="{DynamicResource 'UI:Исключите папки с часто меняющимися файлами, например кэшем или результатами сборки. Поиск по этим папкам может стать медленнее. Уже настроенные правила для вложенных папок сохраняются.'}" />
                                 <ListBox x:Name="IndexExclusionsList" MaxHeight="140" Margin="0,10,0,0" Visibility="Collapsed"
-                                         SelectionChanged="IndexExclusionSelectionChanged" AutomationProperties.Name="Исключения из индексации, добавленные CoreShift" />
+                                         SelectionChanged="IndexExclusionSelectionChanged" AutomationProperties.Name="{DynamicResource 'UI:Исключения из индексации, добавленные CoreShift'}" />
                                 <WrapPanel Margin="0,10,0,0">
-                                    <Button x:Name="AddIndexExclusionButton" Content="Исключить папку…" Click="AddIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
-                                    <Button x:Name="RestoreIndexExclusionButton" Content="Восстановить индексацию" Click="RestoreIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
-                                    <Button Content="Открыть параметры поиска" Click="OpenPerformanceSettingsClick" Tag="ms-settings:search" />
+                                    <Button x:Name="AddIndexExclusionButton" Content="{DynamicResource 'UI:Исключить папку…'}" Click="AddIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
+                                    <Button x:Name="RestoreIndexExclusionButton" Content="{DynamicResource 'UI:Восстановить индексацию'}" Click="RestoreIndexExclusionClick" IsEnabled="False" Margin="0,0,8,0" />
+                                    <Button Content="{DynamicResource 'UI:Открыть параметры поиска'}" Click="OpenPerformanceSettingsClick" Tag="ms-settings:search" />
                                 </WrapPanel>
                                 <TextBlock x:Name="IndexExclusionStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
                                            AutomationProperties.LiveSetting="Polite" />
@@ -728,76 +882,357 @@
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="0,0,0,10" Padding="16">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Временный план питания для игры" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Временный план питания для игры'}" />
                                 <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
-                                           Text="Профиль фокуса может переключить Windows на план «Высокая производительность» после первого перехода в игру. Исходный план возвращается после закрытия игры, отключения питания от сети или остановки профиля." />
-                                <Button Content="Открыть профиль фокуса" Click="OpenProfileClick" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                                           Text="{DynamicResource 'UI:Профиль фокуса может переключить Windows на план «Высокая производительность» после первого перехода в игру. Исходный план возвращается после закрытия игры, отключения питания от сети или остановки профиля.'}" />
+                                <Button Content="{DynamicResource 'UI:Открыть профиль фокуса'}" Click="OpenProfileClick" HorizontalAlignment="Left" Margin="0,10,0,0" />
                             </StackPanel>
                         </Border>
                         <TextBlock x:Name="TweaksStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"
                                    Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
                         <ItemsControl x:Name="TweakItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                        </StackPanel></TabItem>
+                        <TabItem Header="{DynamicResource 'UI:Память'}"><StackPanel><Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Нехватка памяти'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Проверьте запас до лимита во вкладке «Память». Увеличение файла подкачки даёт запас при пиковых нагрузках.'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Открыть память'}" Click="OpenMemoryClick" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border> <Border Style="{StaticResource Card}" Margin="0" Padding="16">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Увеличение файла подкачки'}" />
+                                <TextBlock x:Name="PagefileTweakState" Foreground="{DynamicResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="{DynamicResource 'UI:Увеличивает лимит выделяемой памяти. Для подкачки предпочтителен быстрый SSD с запасом свободного места. На HDD или медленном SSD частая подкачка ухудшает отзывчивость. Активная подкачка добавляет записи на SSD.'}" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="{DynamicResource 'UI:Ручной максимум ограничивает рост файла. После применения и восстановления нужна перезагрузка.'}" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
+                                        <Label Content="{DynamicResource 'UI:Начальный, МБ'}" Target="{Binding ElementName=PagefileInitialValue}"
+                                               Foreground="{DynamicResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox x:Name="PagefileInitialValue" Width="84" MaxLength="10" IsEnabled="False" VerticalContentAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
+                                        <Label Content="{DynamicResource 'UI:Максимальный, МБ'}" Target="{Binding ElementName=PagefileMaximumValue}"
+                                               Foreground="{DynamicResource Text}" Padding="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox x:Name="PagefileMaximumValue" Width="84" MaxLength="10" IsEnabled="False" VerticalContentAlignment="Center" />
+                                    </StackPanel>
+                                </WrapPanel>
+                                <WrapPanel Margin="0,4,0,0">
+                                    <Button x:Name="ApplyPagefileButton" Content="{DynamicResource 'UI:Применить'}" Style="{StaticResource PrimaryButton}"
+                                            IsEnabled="False" Click="ApplyPagefileClick" Margin="0,0,8,0" />
+                                    <Button x:Name="RestorePagefileButton" Content="{DynamicResource 'UI:Восстановить'}" IsEnabled="False" Click="RestorePagefileClick" />
+                                </WrapPanel>
+                                <TextBlock x:Name="PagefileTweakStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                           Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border></StackPanel></TabItem>
+                        <TabItem Header="{DynamicResource 'UI:Компоненты'}"><StackPanel><Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Совместимость со старыми программами'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Устанавливайте компоненты, когда их требует конкретная игра или программа. Windows может загрузить файлы обновлений.'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Установить DirectPlay'}" Click="RunMaintenanceClick" Tag="directplay" Margin="0,0,7,7"  />
+                    <Button x:Name="NetFrameworkButton" Content="{DynamicResource 'UI:Установить .NET Framework 3.5'}" Click="RunMaintenanceClick" Tag="netfx3" Margin="0,0,7,7" />
+                    <Button Content="{DynamicResource 'UI:Компоненты Windows'}" Click="OpenWindowsUtilityClick" Tag="OptionalFeatures.exe" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Приложения по умолчанию'}" Click="OpenWindowsLinkClick" Tag="ms-settings:defaultapps" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border><Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Хранилище компонентов WinSxS'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Сначала проверьте, рекомендует ли Windows очистку хранилища компонентов.'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Проверить WinSxS'}" Click="RunMaintenanceClick" Tag="analyze" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Очистить WinSxS'}" Click="RunMaintenanceClick" Tag="cleanup" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border></StackPanel></TabItem>
+                        <TabItem Header="{DynamicResource 'UI:Восстановление'}"><StackPanel><Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Восстановление файлов Windows'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:DISM восстанавливает хранилище компонентов. SFC проверяет системные файлы и может заменить повреждённые копии.'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Проверить системные файлы'}" Click="RunMaintenanceClick" Tag="sfc-check" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Восстановить через DISM'}" Click="RunMaintenanceClick" Tag="dism" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Восстановить через SFC'}" Click="RunMaintenanceClick" Tag="sfc" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Открыть очистку'}" Click="OpenCleanClick" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border><Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Точки восстановления'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Точки восстановления сохраняют состояние системных файлов и настроек Windows. Windows ограничивает частоту создания точек.'}" Margin="0,5,0,12" /><WrapPanel>
+                    <Button Content="{DynamicResource 'UI:Создать точку восстановления'}" Click="RunMaintenanceClick" Tag="restore-point" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Защита системы'}" Click="OpenWindowsUtilityClick" Tag="SystemPropertiesProtection.exe" Margin="0,0,7,7"  />
+                    <Button Content="{DynamicResource 'UI:Восстановление системы'}" Click="OpenWindowsUtilityClick" Tag="rstrui.exe" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    </StackPanel></Border></StackPanel></TabItem>
+                    </TabControl>
+                    <Border x:Name="MaintenanceResult" Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="Collapsed">
+                        <StackPanel>
+                            <ProgressBar x:Name="MaintenanceProgress" IsIndeterminate="False" Visibility="Collapsed" Height="4"
+                                         Background="{DynamicResource Raised}" Foreground="{DynamicResource Accent}" Margin="0,0,0,8" />
+                            <TextBlock x:Name="MaintenanceStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                            <TextBox x:Name="MaintenanceOutput" IsReadOnly="True" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" MaxHeight="230" Margin="0,8,0,0" Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
                     </StackPanel>
 
                     <StackPanel x:Name="PrivacyPage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Персонализация и приватность" Margin="0,0,0,17" />
-                        <TextBlock x:Name="PrivacyStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"
-                                   Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
-                        <ItemsControl x:Name="PrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Телеметрия'}" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,12"
+                                   Text="{DynamicResource 'UI:Управляйте диагностикой Windows, персональными предложениями и облачными функциями.'}" />
+                        <Border Style="{StaticResource PolicyCard}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Диагностические данные Windows'}" />
+                                <TextBlock x:Name="DiagnosticCurrent" Style="{StaticResource SecondaryText}" Margin="0,7,0,4" />
+                                <TextBlock x:Name="DiagnosticHint" Style="{StaticResource SecondaryText}" Margin="0,0,0,10" />
+                                <WrapPanel>
+                                    <ComboBox x:Name="DiagnosticPicker" Width="260" Style="{StaticResource DarkComboBox}" Margin="0,0,8,6"
+                                              AutomationProperties.Name="{DynamicResource 'UI:Уровень диагностики Windows'}">
+                                        <ComboBoxItem x:Name="DiagnosticOff" Content="{DynamicResource 'UI:Отключены'}" />
+                                        <ComboBoxItem Content="{DynamicResource 'UI:Только обязательные'}" />
+                                        <ComboBoxItem Content="{DynamicResource 'UI:Обязательные и необязательные'}" />
+                                    </ComboBox>
+                                    <Button x:Name="DiagnosticApplyButton" Content="{DynamicResource 'UI:Применить'}" Click="ChangeDiagnosticClick"
+                                            Style="{StaticResource PrimaryButton}" Margin="0,0,8,6" />
+                                    <Button x:Name="DiagnosticRestoreButton" Content="{DynamicResource 'UI:Восстановить'}"
+                                            Click="ChangeDiagnosticClick" Margin="0,0,8,6" />
+                                    <Button Content="{DynamicResource 'UI:Диагностика и отзывы в Windows'}" Click="OpenWindowsLinkClick"
+                                            Tag="ms-settings:privacy-feedback" Margin="0,0,0,6" />
+                                </WrapPanel>
+                                <TextBlock x:Name="DiagnosticActionStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                           Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="PrivacyStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                   Margin="0,0,0,10" AutomationProperties.LiveSetting="Polite" />
+                        <TabControl x:Name="PrivacyPolicyTabs" Style="{StaticResource WorkspaceTabs}" SelectionChanged="MaintenanceTabChanged"
+                                    AutomationProperties.Name="{DynamicResource 'UI:Параметры телеметрии'}">
+                            <TabItem Header="{DynamicResource 'UI:Отчёты и журналы'}">
+                                <ItemsControl x:Name="DiagnosticPrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Рекомендации и реклама'}">
+                                <ItemsControl x:Name="RecommendationPrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Голос, поиск и облако'}">
+                                <ItemsControl x:Name="CloudPrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Разрешения приложений'}">
+                                <ItemsControl x:Name="AppPrivacyItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Защита Windows'}">
+                                <StackPanel>
+                                    <TextBlock x:Name="WindowsProtectionStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                                    <ItemsControl x:Name="WindowsProtectionItems" ItemTemplate="{StaticResource WindowsSettingCard}" />
+                                </StackPanel>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Проверка Windows'}">
+                                <Border Style="{StaticResource PolicyCard}"><StackPanel x:Name="PrivacyMaintenanceButtons">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Целостность Windows'}" />
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <Button Content="SFC /verifyonly" Tag="sfc-check" Click="RunMaintenanceClick" Margin="0,0,7,7" />
+                                        <Button Content="SFC /scannow" Tag="sfc" Click="RunMaintenanceClick" Margin="0,0,7,7" />
+                                        <Button Content="DISM /ScanHealth" Tag="dism-scan" Click="RunMaintenanceClick" Margin="0,0,7,7" />
+                                        <Button Content="DISM /RestoreHealth" Tag="dism" Click="RunMaintenanceClick" Margin="0,0,0,7" />
+                                    </WrapPanel>
+                                    <ProgressBar x:Name="PrivacyMaintenanceProgress" Height="4" Visibility="Collapsed" />
+                                    <TextBlock x:Name="PrivacyMaintenanceStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                                    <TextBox x:Name="PrivacyMaintenanceOutput" IsReadOnly="True" Visibility="Collapsed" MaxHeight="320" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                                </StackPanel></Border>
+                            </TabItem>
+                        </TabControl>
                     </StackPanel>
 
+
+                    <StackPanel x:Name="PackagesPage" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:UWP-приложения'}" />
+                    <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Найдите установленные пакеты и выберите необязательные приложения для удаления у текущего пользователя.'}" Margin="0,5,0,12" />
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12"><StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Пакеты текущего пользователя'}" />
+                    <Label Content="{DynamicResource 'UI:Поиск по имени пакета'}" Target="{Binding ElementName=PackagesFilter}" Foreground="{DynamicResource Muted}" Padding="0" Margin="0,9,0,4" />
+                    <DockPanel Margin="0,0,0,9">
+                        <Button x:Name="RefreshPackagesButton" DockPanel.Dock="Right" Content="{DynamicResource 'UI:Обновить'}" Click="RefreshPackagesClick" Margin="8,0,0,0" />
+                        <TextBox x:Name="PackagesFilter" TextChanged="PackageFilterChanged" AutomationProperties.Name="{DynamicResource 'UI:Поиск по имени пакета'}" />
+                    </DockPanel>
+                    <CheckBox x:Name="PackagesOptionalOnly" IsChecked="True" Content="{DynamicResource 'UI:Только доступные к удалению'}"
+                              Style="{StaticResource SettingsSwitch}" Click="PackageFilterChanged" Margin="0,0,0,9" />
+                    <ListBox x:Name="PackagesList" MinHeight="46" MaxHeight="300" Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}"
+                             BorderThickness="1" Style="{StaticResource ProfileProcessList}" Focusable="False">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Style="{StaticResource ProfileProcessChoice}" IsEnabled="{Binding CanRemove}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="PackageChecked" AutomationProperties.Name="{Binding Name}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Version}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" />
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                    </DockPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="PackagesEmpty" Text="{DynamicResource 'UI:Приложения не найдены'}" Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,6,0,0" />
+                    <TextBlock x:Name="PackageSelectionText" Style="{StaticResource SecondaryText}" Margin="0,9,0,8" />
+                    <WrapPanel>
+                        <Button x:Name="RemovePackagesButton" Content="{DynamicResource 'UI:Удалить выбранное'}" Click="RemovePackagesClick" IsEnabled="False" Style="{StaticResource PrimaryButton}" Margin="0,0,7,7" />
+                        <Button Content="{DynamicResource 'UI:Открыть Microsoft Store'}" Click="OpenMicrosoftStoreClick" Margin="0,0,7,7"  />
+                    </WrapPanel>
+                    <TextBlock x:Name="PackagesStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel></Border>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PersonalizationPage" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Персонализация'}" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,12"
+                                   Text="{DynamicResource 'UI:Настройте внешний вид Windows, меню «Пуск» и панель задач.'}" />
+                        <TextBlock x:Name="WindowsAppearanceStatus" Style="{StaticResource SecondaryText}" AutomationProperties.LiveSetting="Polite" />
+                        <Border Style="{StaticResource PolicyCard}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Рабочий стол'}" />
+                                <WrapPanel Margin="0,8,0,8">
+                                    <Button Content="{DynamicResource 'UI:Выбрать обои'}" Click="WallpaperClick" Margin="0,0,8,0" />
+                                    <Button x:Name="WallpaperRestoreButton" Content="{DynamicResource 'UI:Восстановить обои'}" IsEnabled="False" Click="RestoreWallpaperClick" />
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Залипание клавиш по Shift'}" />
+                                <TextBlock x:Name="StickyShortcutState" Style="{StaticResource SecondaryText}" />
+                                <WrapPanel Margin="0,6,0,0">
+                                    <Button Content="{DynamicResource 'UI:Включить'}" Tag="on" Click="StickyShortcutClick" Margin="0,0,8,0" />
+                                    <Button Content="{DynamicResource 'UI:Отключить'}" Tag="off" Click="StickyShortcutClick" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="WindowEffectsCard" Style="{StaticResource PolicyCard}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Оптимизация окон'}" />
+                                <TextBlock x:Name="WindowEffectsState" Foreground="{DynamicResource Violet}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,0"
+                                           Text="{DynamicResource 'UI:Отключает прозрачность и системные анимации окон, меню и всплывающих подсказок для текущего пользователя. Некоторые приложения обновят оформление после повторного запуска или входа в Windows.'}" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="ApplyWindowEffectsButton" Content="{DynamicResource 'UI:Применить'}" Style="{StaticResource PrimaryButton}"
+                                            IsEnabled="False" Click="ApplyWindowEffectsClick" Margin="0,0,8,4" />
+                                    <Button x:Name="RestoreWindowEffectsButton" Content="{DynamicResource 'UI:Восстановить'}" IsEnabled="False"
+                                            Click="RestoreWindowEffectsClick" Margin="0,0,0,4" />
+                                </WrapPanel>
+                                <TextBlock x:Name="WindowEffectsStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                           Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="PersonalizationStatus" Style="{StaticResource SecondaryText}" Visibility="Collapsed"
+                                   Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite" />
+                        <TabControl x:Name="PersonalizationTabs" Style="{StaticResource WorkspaceTabs}" SelectionChanged="MaintenanceTabChanged">
+                            <TabItem Header="{DynamicResource 'UI:Оформление Windows'}">
+                                <StackPanel><ItemsControl x:Name="WindowsAppearanceItems" ItemTemplate="{StaticResource WindowsSettingCard}" /><ItemsControl x:Name="PersonalizationItems" ItemTemplate="{StaticResource WindowsTweakCard}" /></StackPanel>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Проводник'}">
+                                <ItemsControl x:Name="ExplorerPersonalizationItems" ItemTemplate="{StaticResource WindowsTweakCard}" />
+                            </TabItem>
+                            <TabItem Header="{DynamicResource 'UI:Панель задач и меню «Пуск»'}">
+                                <StackPanel><ItemsControl x:Name="WindowsTaskbarItems" ItemTemplate="{StaticResource WindowsSettingCard}" /><ItemsControl x:Name="TaskbarPersonalizationItems" ItemTemplate="{StaticResource WindowsTweakCard}" /></StackPanel>
+                            </TabItem>
+                        </TabControl>
+                    </StackPanel>
+
+
                     <StackPanel x:Name="ProfilePage" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Профиль фокуса" />
-                        <TextBlock Style="{StaticResource SecondaryText}" Text="Временный приоритет приложения и план питания на время игры. Профиль останавливается при выходе из выбранного приложения." Margin="0,4,0,17" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:Профиль фокуса'}" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Управляйте приоритетом группы процессов и сравнивайте их нагрузку.'}" Margin="0,4,0,13" />
+                        <Border Style="{StaticResource ComponentTile}" Margin="0,0,0,13" Padding="13">
+                            <StackPanel>
+                                <DockPanel>
+                                    <WrapPanel DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Button x:Name="StartProfileButton" Content="{DynamicResource 'UI:Запустить профиль'}"
+                                                Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="StartProfileClick" />
+                                        <Button x:Name="StopProfileButton" Content="{DynamicResource 'UI:Остановить'}" Visibility="Collapsed"
+                                                IsEnabled="False" Click="StopProfileClick" />
+                                    </WrapPanel>
+                                    <Ellipse x:Name="FocusSignalLamp" DockPanel.Dock="Left" Width="8" Height="8"
+                                             Fill="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,9,0" />
+                                    <TextBlock x:Name="FocusSignalTitle" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                               AutomationProperties.LiveSetting="Polite" />
+                                </DockPanel>
+                                <ListBox x:Name="FocusSignalTargets" Visibility="Collapsed" Margin="0,7,0,0" MaxHeight="151"
+                                         Style="{StaticResource ProfileProcessList}" Focusable="False" BorderThickness="0" Background="Transparent">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="9,6" CornerRadius="6" Margin="0,2,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{DynamicResource GlassCard}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsApplied}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource Selected}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Text}" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding Transition}" Foreground="{DynamicResource Text}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding State}" Style="{StaticResource SecondaryText}" FontSize="12" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="0.88*" /><ColumnDefinition Width="15" /><ColumnDefinition Width="1.12*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Приложение и приоритет" />
-                                <Label Content="Открытое приложение" Target="{Binding ElementName=ProfileApplication}"
-                                       Foreground="{StaticResource Text}" Padding="0" Margin="0,14,0,6" />
-                                <Grid HorizontalAlignment="Left">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="350" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ProfileApplication" Style="{StaticResource DarkComboBox}" Tag="Выберите приложение"
-                                              IsEnabled="False" SelectionChanged="ProfileApplicationChanged" TextSearch.TextPath="Label">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <Button x:Name="RefreshProfileApplicationsButton" Grid.Column="1" Content="Обновить"
-                                            AutomationProperties.Name="Обновить список открытых приложений"
-                                            Click="RefreshProfileApplicationsClick" Margin="8,0,0,0" />
-                                </Grid>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Процессы и приоритет'}" />
+                                <Label Content="{DynamicResource 'UI:Поиск по имени или PID'}" Target="{Binding ElementName=ProfileProcessFilter}"
+                                       Foreground="{DynamicResource Muted}" Padding="0" Margin="0,12,0,5" />
+                                <DockPanel Margin="0,0,0,6" LastChildFill="True">
+                                    <Button x:Name="RefreshProfileApplicationsButton" DockPanel.Dock="Right"
+                                            Content="{DynamicResource 'UI:Обновить'}" Click="RefreshProfileApplicationsClick" Margin="8,0,0,0" />
+                                    <TextBox x:Name="ProfileProcessFilter" TextChanged="ProfileProcessFilterChanged"
+                                             AutomationProperties.Name="{DynamicResource 'UI:Поиск по имени или PID'}"
+                                             ToolTip="{DynamicResource 'UI:Поиск по имени или PID'}" />
+                                </DockPanel>
+                                <ListBox x:Name="ProfileApplication" MaxHeight="156" MinHeight="46" Background="{DynamicResource Canvas}"
+                                         BorderBrush="{DynamicResource Line}" BorderThickness="1" Focusable="False"
+                                         Style="{StaticResource ProfileProcessList}"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         AutomationProperties.Name="{DynamicResource 'UI:Выберите процессы'}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="ProfileApplicationChanged"
+                                                      Style="{StaticResource ProfileProcessChoice}" AutomationProperties.Name="{Binding Label}" ToolTip="{Binding Label}">
+                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock x:Name="ProfileSelectionText" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
                                 <TextBlock x:Name="ProfileApplicationStatus" Style="{StaticResource SecondaryText}"
                                            Visibility="Collapsed" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite" />
-                                <TextBlock Text="Приоритет в фокусе" Margin="0,14,0,6" />
+                                <TextBlock Text="{DynamicResource 'UI:Приоритет в фокусе'}" Margin="0,14,0,6" />
                                 <WrapPanel x:Name="PriorityChoices" Margin="0,0,0,8">
-                                    <RadioButton x:Name="AbovePriority" Content="Выше обычного" Style="{StaticResource ChoiceButton}" GroupName="Priority" IsChecked="True" />
-                                    <RadioButton x:Name="NormalPriority" Content="Обычный" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
-                                    <RadioButton Content="Ниже обычного" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
+                                    <RadioButton x:Name="AbovePriority" Content="{DynamicResource 'UI:Выше обычного'}" Style="{StaticResource ChoiceButton}" GroupName="Priority" IsChecked="True" />
+                                    <RadioButton Content="{DynamicResource 'UI:Ниже обычного'}" Style="{StaticResource ChoiceButton}" GroupName="Priority" />
                                 </WrapPanel>
+                                <CheckBox x:Name="CompareMode" Content="{DynamicResource 'UI:Сравнительный замер'}" Style="{StaticResource SettingsSwitch}"
+                                          Click="FocusModeChanged" Margin="0,4,0,8" />
+                                <CheckBox x:Name="FocusBackground" Content="{DynamicResource 'UI:Работать и в фоне'}" Style="{StaticResource SettingsSwitch}"
+                                          Margin="0,4,0,8" />
+                                <TextBlock Text="{DynamicResource 'UI:Приоритет применяется ко всей группе, пока активно окно любого выбранного процесса. Фоновый режим снимает это ограничение.'}"
+                                           Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,0,0,8" />
+                                <CheckBox x:Name="FocusMonitorToggle" Content="{DynamicResource 'UI:Показывать окно замера поверх приложений'}"
+                                          Style="{StaticResource SettingsSwitch}" Click="FocusMonitorChanged" Margin="0,4,0,8" />
                                 <CheckBox x:Name="ProfileGamePower" Style="{StaticResource CleanupOption}" Margin="0,5,0,6"
-                                          Content="Включать план «Высокая производительность» для выбранного приложения" />
+                                          Content="{DynamicResource 'UI:Включать план «Высокая производительность»'}" />
                                 <TextBlock x:Name="ProfilePowerStatus" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"
-                                           Text="Только при питании от сети. Может увеличить энергопотребление и нагрев." />
-                                <WrapPanel>
-                                    <Button x:Name="StartProfileButton" Content="Запустить профиль" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="StartProfileClick" Margin="0,0,8,0" />
-                                    <Button x:Name="StopProfileButton" Content="Остановить" IsEnabled="False" Click="StopProfileClick" />
-                                </WrapPanel>
+                                           Text="{DynamicResource 'UI:Только при питании от сети. Может увеличить энергопотребление и нагрев.'}" />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Состояние профиля" />
-                                <TextBlock x:Name="ProfileStatus" Style="{StaticResource SecondaryText}" Text="Профиль остановлен."
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Журнал сеанса'}" />
+                                <TextBlock x:Name="ProfileStatus" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Профиль остановлен.'}"
                                            Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite" />
-                                <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                <Border Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
                                         CornerRadius="8" Padding="12" Margin="0,12,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="Память за сеанс" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource 'UI:Память за сеанс'}" FontSize="15" FontWeight="SemiBold" />
                                         <TextBlock x:Name="MemorySessionStatus" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
                                         <TextBlock x:Name="MemorySessionPeak" Style="{StaticResource SecondaryText}" Margin="0,6,0,0" />
                                         <ItemsControl x:Name="MemorySessionProcesses">
@@ -818,9 +1253,237 @@
                                 </ItemsControl>
                             </StackPanel>
                         </Border>
+
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                          <StackPanel>
+                            <DockPanel>
+                              <Button x:Name="CopyFocusReportButton" Content="{DynamicResource 'UI:Скопировать отчёт'}" Click="CopyFocusReportClick" DockPanel.Dock="Right" IsEnabled="False" />
+                              <TextBlock Text="{DynamicResource 'UI:Результат замеров'}" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                            </DockPanel>
+                                                        <TextBlock x:Name="FocusTrialStatus" Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Сравнить одинаковую нагрузку без профиля и с ним. Повторите один и тот же сценарий в обоих замерах.'}"
+                                       Margin="0,6,0,10" AutomationProperties.LiveSetting="Polite" />
+                            <ProgressBar x:Name="FocusTrialProgress" Style="{StaticResource MemoryUsageMeter}" Maximum="100" Margin="0,0,0,10" />
+                            <Button x:Name="ContinueFocusTrialButton" Content="{DynamicResource 'UI:К измерению с профилем'}" Click="ContinueFocusTrialClick" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Visibility="Collapsed" Margin="0,0,0,8" />
+
+                            <Grid x:Name="FocusReportHeader" Margin="0,3,0,4">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                              <TextBlock Text="{DynamicResource 'UI:Показатель'}" Style="{StaticResource SecondaryText}" />
+                              <TextBlock Text="{DynamicResource 'UI:Без профиля'}" Grid.Column="1" Style="{StaticResource SecondaryText}" />
+                              <TextBlock Text="{DynamicResource 'UI:С профилем'}" Grid.Column="2" Style="{StaticResource SecondaryText}" />
+                              <TextBlock Text="{DynamicResource 'UI:Разница'}" Grid.Column="3" Style="{StaticResource SecondaryText}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <ItemsControl x:Name="FocusMetricRows">
+                              <ItemsControl.ItemTemplate><DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                  <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Baseline}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Optimized}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Delta}" TextAlignment="Right" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" />
+                                  </Grid>
+                                </Border>
+                              </DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel x:Name="FocusTargetSection" Visibility="Collapsed" Margin="0,14,0,0">
+                                <TextBlock Text="{DynamicResource 'UI:Разница по процессам'}" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource 'UI:Процесс'}" Style="{StaticResource SecondaryText}" />
+                                    <TextBlock Grid.Column="1" Text="{DynamicResource 'UI:ЦП'}" Style="{StaticResource SecondaryText}" />
+                                    <TextBlock Grid.Column="2" Text="{DynamicResource 'UI:Память'}" Style="{StaticResource SecondaryText}" TextAlignment="Right" />
+                                </Grid>
+                                <ItemsControl x:Name="FocusTargetRows">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding CpuDelta}" Foreground="{DynamicResource Accent}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding MemoryDelta}" Foreground="{DynamicResource Violet}" TextAlignment="Right" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <TextBlock x:Name="FocusTrialSummary" Style="{StaticResource SecondaryText}" Margin="0,7,0,0" />
+                            <Border x:Name="FocusFpsPanel" Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                    CornerRadius="12" Padding="12" Margin="0,12,0,0" Visibility="Collapsed">
+                              <StackPanel>
+                                <TextBlock Text="{DynamicResource 'UI:FPS из внешнего оверлея'}" FontWeight="SemiBold" />
+                                <TextBlock Text="{DynamicResource 'UI:Введите средний FPS из двух замеров, если вы записали его отдельно.'}" Style="{StaticResource SecondaryText}" Margin="0,4,0,9" />
+                                <WrapPanel>
+                                  <StackPanel Margin="0,0,8,0">
+                                    <Label Content="{DynamicResource 'UI:Без профиля'}" Target="{Binding ElementName=BaselineFps}" Padding="0,0,0,4" Foreground="{DynamicResource Muted}" />
+                                    <TextBox x:Name="BaselineFps" Width="95" MaxLength="9" TextChanged="FocusFpsChanged" />
+                                  </StackPanel>
+                                  <StackPanel Margin="0,0,8,0">
+                                    <Label Content="{DynamicResource 'UI:С профилем'}" Target="{Binding ElementName=OptimizedFps}" Padding="0,0,0,4" Foreground="{DynamicResource Muted}" />
+                                    <TextBox x:Name="OptimizedFps" Width="95" MaxLength="9" TextChanged="FocusFpsChanged" />
+                                  </StackPanel>
+                                </WrapPanel>
+                                <WrapPanel Margin="0,7,0,0">
+                                  <TextBlock x:Name="FocusFpsDelta" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                  <Button x:Name="SaveFpsButton" Content="{DynamicResource 'UI:Сохранить FPS'}" Click="SaveFocusFpsClick"
+                                          Padding="8,4" MinHeight="28" IsEnabled="False" />
+                                </WrapPanel>
+                              </StackPanel>
+                            </Border>
+                            <TextBlock x:Name="FocusReportStatus" Style="{StaticResource SecondaryText}" Margin="0,7,0,0" Visibility="Collapsed" />
+                          </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                          <StackPanel>
+                            <TextBlock Text="{DynamicResource 'UI:Сохранённые отчёты'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,9" />
+                            <ComboBox x:Name="FocusHistoryPicker" Style="{StaticResource DarkComboBox}" Tag="{DynamicResource 'UI:Пока нет завершённых сравнений.'}"
+                                      SelectionChanged="FocusHistoryChanged">
+                              <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                          </StackPanel>
+                        </Border>
+
+
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
-                </Grid>
-            </ScrollViewer>
+
+                    <StackPanel x:Name="SnapshotsPage" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource 'UI:До и после'}" />
+                        <TextBlock Style="{StaticResource SecondaryText}" Margin="0,5,0,18"
+                                   Text="{DynamicResource 'UI:Снимите показатели до изменения и после него. CoreShift покажет разницу по памяти, процессам и накопителю.'}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width=".7*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="1.3*" />
+                            </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Card}" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Два замера'}" />
+                                <Label Content="{DynamicResource 'UI:Название сеанса (необязательно)'}" Target="{Binding ElementName=SnapshotName}"
+                                       Foreground="{DynamicResource Muted}" Padding="0,0,0,6" Margin="0,10,0,0" />
+                                <StackPanel>
+                                    <TextBox x:Name="SnapshotName" MaxLength="72" />
+                                    <Button x:Name="CaptureSnapshotButton" Content="{DynamicResource 'UI:Снять до'}"
+                                            Click="CaptureSnapshotClick" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                </StackPanel>
+                                    <Button Content="{DynamicResource 'UI:Начать заново'}" x:Name="CancelSnapshotButton"
+                                            Click="CancelSnapshotFlowClick" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Collapsed" />
+                                <TextBlock x:Name="SnapshotStatus" Style="{StaticResource SecondaryText}" Margin="0,8,0,0"
+                                           Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}">
+                            <Border.Resources>
+                                <DataTemplate x:Key="SnapshotChoice">
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
+                                </DataTemplate>
+                            </Border.Resources>
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button x:Name="CopySnapshotButton" DockPanel.Dock="Right" Margin="12,0,0,0" IsEnabled="False"
+                                            Content="{DynamicResource 'UI:Скопировать отчёт'}" Click="CopySnapshotClick" />
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Что изменилось'}" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <UniformGrid Columns="2" Margin="0,10,0,10">
+                                    <StackPanel Margin="0,0,6,0">
+                                        <Label Content="{DynamicResource 'UI:До'}" Target="{Binding ElementName=SnapshotBefore}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                                        <ComboBox x:Name="SnapshotBefore" Style="{StaticResource DarkComboBox}" ItemTemplate="{StaticResource SnapshotChoice}"
+                                                  SelectionChanged="SnapshotComparisonChanged" />
+                                    </StackPanel>
+                                    <StackPanel Margin="6,0,0,0">
+                                        <Label Content="{DynamicResource 'UI:После'}" Target="{Binding ElementName=SnapshotAfter}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                                        <ComboBox x:Name="SnapshotAfter" Style="{StaticResource DarkComboBox}" ItemTemplate="{StaticResource SnapshotChoice}"
+                                                  SelectionChanged="SnapshotComparisonChanged" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock x:Name="SnapshotEmpty" Text="{DynamicResource 'UI:Сохраните два снимка, чтобы увидеть разницу.'}"
+                                           Style="{StaticResource SecondaryText}" TextWrapping="Wrap" />
+                                <ItemsControl x:Name="SnapshotRows">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Values}" Style="{StaticResource SecondaryText}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Difference}" Foreground="{DynamicResource Accent}"
+                                                               FontWeight="SemiBold" TextAlignment="Right" TextWrapping="Wrap" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="SnapshotProcessHeading" Style="{StaticResource SectionTitle}"
+                                           Text="{DynamicResource 'UI:Изменения по приложениям'}" Margin="0,14,0,6" Visibility="Collapsed" />
+                                <ItemsControl x:Name="SnapshotProcessRows">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Right" Content="{DynamicResource 'UI:Найти в процессах'}" Tag="{Binding Label}"
+                                                            Click="FindSnapshotProcessClick" Padding="9,4" MinHeight="27" Margin="12,0,0,0" />
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Difference}" Margin="12,0,0,0"
+                                                               Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="SnapshotCopyStatus" Style="{StaticResource SecondaryText}" Margin="0,7,0,0"
+                                           Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+                        </Grid>
+                    </StackPanel>
+
+            </Grid>
+        </ScrollViewer>
         </Grid>
+
+        <Grid x:Name="CommandOverlay" Grid.RowSpan="3" Panel.ZIndex="20" Visibility="Collapsed"
+              shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border Background="{DynamicResource Scrim}" MouseLeftButtonDown="DismissSearchClick" />
+            <Border x:Name="CommandPanel" Style="{StaticResource Card}" Width="594" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,92,0,18" Padding="17"
+                    KeyboardNavigation.TabNavigation="Cycle">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" Content="Esc" Click="CloseSearchClick" Padding="9,4" MinHeight="27"
+                                AutomationProperties.Name="{DynamicResource 'UI:Закрыть поиск'}" />
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Поиск разделов и действий'}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBox x:Name="SearchQuery" TextChanged="SearchQueryChanged" AutomationProperties.Name="{DynamicResource 'UI:Поисковый запрос'}" />
+                    <ListBox x:Name="SearchResults" Margin="0,9,0,0" MaxHeight="288"
+                             Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}"
+                             AutomationProperties.Name="{DynamicResource 'UI:Результаты поиска'}" PreviewMouseLeftButtonUp="SearchResultClick">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Category}" Style="{StaticResource SecondaryText}"
+                                               FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource SecondaryText}" FontSize="12" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="SearchEmpty" Text="{DynamicResource 'UI:Совпадений нет'}" Style="{StaticResource SecondaryText}" Margin="0,10,0,0" Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+    <Border x:Name="WebHost" Visibility="Collapsed" Background="{DynamicResource Canvas}"
+            shell:WindowChrome.IsHitTestVisibleInChrome="True" />
     </Grid>
 </Window>

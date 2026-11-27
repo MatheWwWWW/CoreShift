@@ -1,3 +1,9 @@
+Shifter uses llama.cpp b12078 under the MIT License and Qwen3-VL 2B Instruct
+GGUF under the Apache License 2.0. Their license texts and the LLVM OpenMP
+license are installed with the model in the Shifter directory.
+llama.cpp: https://github.com/ggml-org/llama.cpp/tree/b12078
+Qwen: https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/tree/52d6c8ffea26cc873ac5ad116f8631268d7eb503
+
 LibreHardwareMonitorLib 0.9.6
 Copyright (C) LibreHardwareMonitor and Contributors.
 Portions Copyright (C) Michael Möller and Contributors.

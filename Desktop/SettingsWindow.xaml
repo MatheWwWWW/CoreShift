@@ -1,0 +1,273 @@
+<Window x:Class="CoreShift.Desktop.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="{DynamicResource 'UI:Настройки'}" Width="1040" Height="740" MinWidth="760" MinHeight="580"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="{DynamicResource UiScale}"
+        Background="{DynamicResource Canvas}" Foreground="{DynamicResource Text}" UseLayoutRounding="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="72" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+  <Grid x:Name="Surface" Background="{DynamicResource Canvas}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="72" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="24,0,15,0" Background="{DynamicResource GlassRail}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Width="40" Height="38" Style="{StaticResource CloseTitleButton}" Click="CloseClick"
+                AutomationProperties.Name="{DynamicResource 'UI:Закрыть'}" ToolTip="{DynamicResource 'UI:Закрыть'}" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+          <Path Data="M 0,0 L 10,10 M 10,0 L 0,10" Stroke="{DynamicResource Text}" StrokeThickness="1.5" />
+        </Button>
+        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+          <Border Background="{DynamicResource Selected}" CornerRadius="12" Width="40" Height="40" Margin="0,0,13,0">
+            <Path Data="{StaticResource CoreShiftMark}" Stroke="{DynamicResource Accent}" StrokeThickness="1.4"
+                  StrokeLineJoin="Round" Stretch="Uniform" Width="20" Height="20" />
+          </Border>
+          <TextBlock Text="{DynamicResource 'UI:Настройки'}" Style="{StaticResource PageTitle}" FontSize="29" VerticalAlignment="Center" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Row="1" Margin="20">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="218" />
+        <ColumnDefinition Width="20" />
+        <ColumnDefinition />
+      </Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}" Padding="8" Background="{DynamicResource GlassRail}" VerticalAlignment="Top">
+        <ListBox x:Name="SectionPicker" SelectionChanged="SectionChanged" Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource SettingsIcon}" Content="{DynamicResource 'UI:Оформление'}" />
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource BoardCpuIcon}" Content="{DynamicResource 'UI:Эффекты и 3D'}" />
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource OverviewIcon}" Content="{DynamicResource 'UI:Рабочая область'}" />
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource FocusIcon}" Content="{DynamicResource 'UI:Профиль фокуса'}" />
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource TweaksIcon}" Content="{DynamicResource 'UI:Инструменты Windows'}" />
+          <ListBoxItem Style="{StaticResource SettingsNavRow}" Tag="{StaticResource SnapshotIcon}" Content="{DynamicResource 'UI:Данные и версия'}" />
+        </ListBox>
+      </Border>
+      <ScrollViewer Grid.Column="2" x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="0,0,8,0">
+          <StackPanel x:Name="AppearancePanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Оболочка и внешний вид'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Интерфейс'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <UniformGrid Columns="2">
+              <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Тема'}" Target="{Binding ElementName=ThemePicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="ThemePicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:Тёмная'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Светлая'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Как в Windows'}" />
+                </ComboBox>
+              </StackPanel>
+            <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Язык'}" Target="{Binding ElementName=LanguagePicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="LanguagePicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:Русский'}" />
+                  <ComboBoxItem Content="English" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Как в Windows'}" />
+                </ComboBox>
+              </StackPanel>
+            </UniformGrid>
+            <UniformGrid Columns="2">
+              <StackPanel Margin="0,0,16,13">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,4,2,0">
+                    <Ellipse Fill="{DynamicResource Canvas}" Stroke="{DynamicResource Line}" Width="12" Height="12" Margin="0,0,4,0" />
+                    <Ellipse Fill="{DynamicResource Panel}" Stroke="{DynamicResource Line}" Width="12" Height="12" Margin="0,0,4,0" />
+                    <Ellipse Fill="{DynamicResource Accent}" Width="12" Height="12" Margin="0,0,4,0" />
+                    <Ellipse Fill="{DynamicResource Violet}" Width="12" Height="12" />
+                  </StackPanel>
+                  <Label Content="{DynamicResource 'UI:Цветовые схемы'}" Target="{Binding ElementName=PalettePicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                </DockPanel>
+                <ComboBox x:Name="PalettePicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:Хвойная'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Сумерки'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Глина'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Побережье'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Графит'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Янтарь'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Вереск'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Лагуна'}" />
+                </ComboBox>
+              </StackPanel>
+            <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Плотность интерфейса'}" Target="{Binding ElementName=DensityPicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="DensityPicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:Стандартная'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Компактная'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Просторная'}" />
+                </ComboBox>
+              </StackPanel>
+            </UniformGrid>
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}"><StackPanel>
+              <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource 'UI:Фон CoreShift'}" />
+              <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Статичный фон для интерфейса WebView2.'}" Margin="0,6,0,8" />
+              <ComboBox x:Name="BackgroundPicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed"
+                        AutomationProperties.Name="{DynamicResource 'UI:Фон CoreShift'}">
+                <ComboBoxItem Content="{DynamicResource 'UI:Печатная плата'}" />
+                <ComboBoxItem Content="{DynamicResource 'UI:Чертёж'}" />
+                <ComboBoxItem Content="{DynamicResource 'UI:Однотонный'}" />
+              </ComboBox>
+            </StackPanel></Border>
+          </StackPanel>
+          <StackPanel x:Name="EffectsPanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Эффекты и 3D'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Графика компонентов'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+              <TextBlock Text="{DynamicResource 'UI:3D загружается при открытии схемы. Датчики опрашиваются при выборе видеокарты.'}"
+                         Style="{StaticResource SecondaryText}" Margin="0,0,0,7" />
+              <CheckBox x:Name="ArtworkToggle" Content="{DynamicResource 'UI:Иллюстрации и 3D-схема'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+              <CheckBox x:Name="BoardOnOverviewToggle" Content="{DynamicResource 'UI:Открывать обзор в 3D'}" Style="{StaticResource SettingsSwitch}"
+                        Click="Changed" Margin="0,7,0,7" />
+              <CheckBox x:Name="SensorsToggle" Content="{DynamicResource 'UI:Считывать датчики выбранной видеокарты'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Движение интерфейса'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+              <CheckBox x:Name="MotionToggle" Content="{DynamicResource 'UI:Плавные переходы'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+              <CheckBox x:Name="HoverToggle" Content="{DynamicResource 'UI:Подсветка и движение при наведении'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+              <CheckBox x:Name="ReducedEffectsToggle" Content="{DynamicResource 'UI:Уменьшать эффекты на батарее'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            </StackPanel></Border>
+          </StackPanel>
+          <StackPanel x:Name="WorkspacePanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Рабочая область'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Запуск и мониторинг'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <UniformGrid Columns="2">
+              <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Начальный экран'}" Target="{Binding ElementName=StartPagePicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="StartPagePicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:Обзор'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:О компьютере'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Память'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Очистка'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Оптимизация'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Телеметрия'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Профиль фокуса'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:До и после'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:UWP-приложения'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:Персонализация'}" />
+                </ComboBox>
+              </StackPanel>
+            <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Интервал обновления обзора'}" Target="{Binding ElementName=IntervalPicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="IntervalPicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:1 секунда'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:2 секунды'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:5 секунд'}" />
+                </ComboBox>
+              </StackPanel>
+            </UniformGrid>
+            <CheckBox x:Name="RestorePageToggle" Content="{DynamicResource 'UI:Возвращаться к последнему открытому разделу'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="TrayToggle" Content="{DynamicResource 'UI:При закрытии сворачивать в область уведомлений'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="MinimizedToggle" Content="{DynamicResource 'UI:Запускать главное окно свёрнутым'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="AutoUpdateToggle" Content="{DynamicResource 'UI:Автоматически проверять обновления'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="NativeInterfaceToggle" Content="{DynamicResource 'UI:Облегчённый интерфейс WPF'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,5" />
+            <TextBlock Style="{StaticResource SecondaryText}" Text="{DynamicResource 'UI:Экономит память. Применится после полного перезапуска CoreShift через меню в трее.'}" />
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13">
+              <StackPanel>
+                <TextBlock Text="{DynamicResource 'UI:Сигнал CoreShift'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,5" />
+                <TextBlock Text="{DynamicResource 'UI:Короткий сигнал после завершения системной команды или второго замера «До и после».'}"
+                           Style="{StaticResource SecondaryText}" Margin="0,0,0,9" />
+                <CheckBox x:Name="TaskSoundToggle" Content="{DynamicResource 'UI:Подавать сигнал по завершении'}" Style="{StaticResource SettingsSwitch}"
+                          Click="Changed" Margin="0,4,0,8" />
+                <Button Content="{DynamicResource 'UI:Прослушать'}" Click="PlayTaskSoundClick" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="FocusPanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Профиль фокуса'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Замеры и история'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <UniformGrid Columns="2">
+              <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Длительность каждого замера'}" Target="{Binding ElementName=DurationPicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="DurationPicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="{DynamicResource 'UI:10 секунд'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:20 секунд'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:30 секунд'}" />
+                  <ComboBoxItem Content="{DynamicResource 'UI:60 секунд'}" />
+                </ComboBox>
+              </StackPanel>
+            <StackPanel Margin="0,0,16,13">
+                <Label Content="{DynamicResource 'UI:Хранить отчётов'}" Target="{Binding ElementName=ReportLimitPicker}" Foreground="{DynamicResource Muted}" Padding="0,0,0,6" />
+                <ComboBox x:Name="ReportLimitPicker" Style="{StaticResource DarkComboBox}" SelectionChanged="Changed">
+                  <ComboBoxItem Content="5" />
+                  <ComboBoxItem Content="15" />
+                  <ComboBoxItem Content="30" />
+                </ComboBox>
+              </StackPanel>
+            </UniformGrid>
+            <CheckBox x:Name="FocusCompareToggle" Content="{DynamicResource 'UI:Режим сравнения по умолчанию'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="FocusPowerToggle" Content="{DynamicResource 'UI:Использовать план питания по умолчанию'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            <CheckBox x:Name="FocusSaveToggle" Content="{DynamicResource 'UI:Сохранять отчёты профиля на этом ПК'}" Style="{StaticResource SettingsSwitch}" Click="Changed" Margin="0,7,0,7" />
+            </StackPanel></Border>
+          </StackPanel>
+          <StackPanel x:Name="SystemPanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Системные инструменты'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Хранилище и обновления'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <WrapPanel>
+              <Button Content="{DynamicResource 'UI:Хранилище'}" Click="ToolClick" Tag="ms-settings:storagesense" Margin="0,0,8,8" />
+            <Button Content="{DynamicResource 'UI:Установленные приложения'}" Click="ToolClick" Tag="ms-settings:appsfeatures" Margin="0,0,8,8" />
+            <Button Content="{DynamicResource 'UI:Обновления Windows'}" Click="ToolClick" Tag="ms-settings:windowsupdate" Margin="0,0,8,8" />
+            <Button Content="{DynamicResource 'UI:Автозагрузка Windows'}" Click="ToolClick" Tag="ms-settings:startupapps" Margin="0,0,8,8" />
+            <Button Content="{DynamicResource 'UI:Параметры графики'}" Click="ToolClick" Tag="ms-settings:display-advancedgraphics" Margin="0,0,8,8" />
+            </WrapPanel>
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Средства диагностики'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <WrapPanel>
+                <Button Content="{DynamicResource 'UI:Диспетчер задач'}" Click="ToolClick" Tag="taskmgr.exe" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Монитор ресурсов'}" Click="ToolClick" Tag="resmon.exe" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Диспетчер устройств'}" Click="ToolClick" Tag="devmgmt.msc" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Просмотр событий'}" Click="ToolClick" Tag="eventvwr.msc" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Планировщик заданий'}" Click="ToolClick" Tag="taskschd.msc" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Управление дисками'}" Click="ToolClick" Tag="diskmgmt.msc" Margin="0,0,8,8" />
+                <Button Content="{DynamicResource 'UI:Открыть параметры системы'}" Click="ToolClick" Tag="SystemPropertiesAdvanced.exe" Margin="0,0,8,8" />
+              </WrapPanel>
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13">
+              <StackPanel>
+                <TextBlock Text="{DynamicResource 'UI:Горячие клавиши'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
+                <TextBlock Text="{DynamicResource 'UI:Ctrl+K — открыть поиск'}" Style="{StaticResource SecondaryText}" Margin="0,0,0,5" />
+                <TextBlock Text="{DynamicResource 'UI:Ctrl+, — открыть настройки'}" Style="{StaticResource SecondaryText}" Margin="0,0,0,5" />
+                <TextBlock Text="{DynamicResource 'UI:Esc — закрыть поиск или окно настроек'}" Style="{StaticResource SecondaryText}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="DataPanel" Visibility="Collapsed">
+            <TextBlock Text="{DynamicResource 'UI:Данные и версия'}" Style="{StaticResource PageTitle}" FontSize="27" Margin="0,0,0,13" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13">
+              <StackPanel>
+                <TextBlock Text="{DynamicResource 'UI:Обновления CoreShift'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
+                <Button x:Name="CheckUpdateButton" Content="{DynamicResource 'UI:Проверить обновления'}" Click="CheckUpdateClick" HorizontalAlignment="Left" />
+                <TextBlock x:Name="UpdateAvailability" Text="{DynamicResource 'UI:Проверка доступна в установленной версии CoreShift.'}" Style="{StaticResource SecondaryText}" Margin="0,7,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,13"><StackPanel>
+              <TextBlock Text="{DynamicResource 'UI:Версия и локальные данные'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+              <TextBlock x:Name="VersionText" Style="{StaticResource MetricValue}" />
+            <TextBlock Text="{DynamicResource 'UI:Настройки, снимки и история фокуса хранятся на этом ПК.'}" Style="{StaticResource SecondaryText}" Margin="0,4,0,16" />
+            <WrapPanel>
+              <Button Content="{DynamicResource 'UI:Открыть папку данных'}" Click="OpenDataClick"  Margin="0,0,8,8" />
+            <Button Content="{DynamicResource 'UI:Что нового?'}" Click="ReleaseNotesClick"  Margin="0,0,8,8" />
+            </WrapPanel>
+            <WrapPanel>
+              <Button Content="{DynamicResource 'UI:Экспортировать настройки'}" Click="ExportClick" Margin="0,0,8,8" />
+              <Button Content="{DynamicResource 'UI:Импортировать настройки'}" Click="ImportClick" Margin="0,0,8,8" />
+              <Button Content="{DynamicResource 'UI:Сбросить настройки CoreShift'}" Click="ResetClick"  Margin="0,0,8,8" />
+            </WrapPanel>
+            </StackPanel></Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+    </Grid>
+    <TextBlock x:Name="Status" Grid.Row="2" Visibility="Collapsed" Style="{StaticResource SecondaryText}" Margin="23,0,23,15"
+               AutomationProperties.LiveSetting="Polite" />
+  </Grid>
+</Window>

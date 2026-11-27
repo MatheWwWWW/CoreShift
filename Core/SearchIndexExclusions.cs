@@ -21,13 +21,13 @@ internal static class SearchIndexExclusions
         string root = Path.GetPathRoot(folder)!;
         if (root.Length != 3 || root[1] != ':' || folder.Equals(root, StringComparison.OrdinalIgnoreCase) ||
             (!restore && (!Directory.Exists(folder) || new DriveInfo(root).DriveType != DriveType.Fixed)))
-            throw new ArgumentException("Выберите существующую папку на локальном диске.");
+            throw new ArgumentException(UiText.Get("Выберите существующую папку на локальном диске."));
 
         using var mutex = new Mutex(false, @"Global\SmartResourceDispatcher.SearchIndexExclusions");
         try
         {
             if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
-                throw new InvalidOperationException("Другая операция с индексом Windows ещё выполняется.");
+                throw new InvalidOperationException(UiText.Get("Другая операция с индексом Windows ещё выполняется."));
         }
         catch (AbandonedMutexException)
         {
@@ -68,7 +68,7 @@ internal static class SearchIndexExclusions
         if (restore)
         {
             if (existing is { Included: true } or { FollowFlags: not 0 })
-                throw new InvalidOperationException("Правило индексации изменено в Windows. Сохранена текущая настройка.");
+                throw new InvalidOperationException(UiText.Get("Правило индексации изменено в Windows. Сохранена текущая настройка."));
             if (existing is not null)
             {
                 scopes.RemoveScopeRule(existing.Pattern);

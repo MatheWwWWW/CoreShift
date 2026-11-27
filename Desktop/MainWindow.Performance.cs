@@ -19,11 +19,11 @@ public partial class MainWindow
         gamePowerPlanAvailable = GamePowerProfile.IsAvailable();
         ProfileGamePower.IsEnabled = gamePowerPlanAvailable;
         if (!gamePowerPlanAvailable)
-            ProfilePowerStatus.Text = "План «Высокая производительность» недоступен на этом компьютере.";
+            ProfilePowerStatus.Text = UiText.Get("План «Высокая производительность» недоступен на этом компьютере.");
 
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621))
         {
-            WindowedGamesHelp.Text = "Оптимизация оконных игр доступна в Windows 11 версии 22H2 и новее.";
+            WindowedGamesHelp.Text = UiText.Get("Оптимизация оконных игр доступна в Windows 11 версии 22H2 и новее.");
             WindowedGamesButton.IsEnabled = false;
         }
     }
@@ -50,9 +50,9 @@ public partial class MainWindow
             var (unsupported, state) = await RunInBackground(() => (TweaksEngine.SupportIssue(tweak), TweaksEngine.ReadSetting(tweak)));
             DownloadLimitState.Text = unsupported ?? state.Current switch
             {
-                null => "Системная политика лимита не задана.",
-                0 => "В политике задан автоматический лимит.",
-                var percent => $"В политике задан лимит {percent}%.",
+                null => UiText.Get("Системная политика лимита не задана."),
+                0 => UiText.Get("В политике задан автоматический лимит."),
+                var percent => UiText.Format($"В политике задан лимит {percent}%."),
             };
             DownloadLimitValue.Text = (state.Current is >= 1 and <= 100 ? state.Current.Value : tweak.AppliedValue)
                 .ToString(CultureInfo.CurrentCulture);
@@ -60,7 +60,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            DownloadLimitState.Text = $"Не удалось прочитать политику. {ex.Message}";
+            DownloadLimitState.Text = UiText.Format($"Не удалось прочитать политику. {ex.Message}");
             SetDownloadLimitControls(false, false);
         }
     }
@@ -77,7 +77,7 @@ public partial class MainWindow
         DownloadLimitStatus.Visibility = Visibility.Visible;
         if (!int.TryParse(DownloadLimitValue.Text.Trim(), NumberStyles.None, CultureInfo.CurrentCulture, out int percent) || percent is < 1 or > 100)
         {
-            SetStatus(DownloadLimitStatus, "Укажите целое число от 1 до 100.", error: true);
+            SetStatus(DownloadLimitStatus, UiText.Get("Укажите целое число от 1 до 100."), error: true);
             return;
         }
         await ChangeDownloadLimitAsync(TweaksEngine.BackgroundDownloadLimit with { AppliedValue = percent }, restore: false);
@@ -94,16 +94,16 @@ public partial class MainWindow
         workingWithDownloadLimit = true;
         SetDownloadLimitControls(false, false);
         DownloadLimitStatus.Visibility = Visibility.Visible;
-        SetStatus(DownloadLimitStatus, "Обновляем политику загрузок…");
+        SetStatus(DownloadLimitStatus, UiText.Get("Обновляем политику загрузок…"));
         try
         {
             bool changed = await RunInBackground(() => TweaksEngine.Change(tweak, restore));
             SetStatus(DownloadLimitStatus, (restore, changed) switch
             {
-                (false, true) => $"Записан лимит {tweak.AppliedValue}%.",
-                (false, false) => "Этот лимит уже задан.",
-                (true, true) => "Исходная настройка восстановлена.",
-                _ => "Сохранённая настройка отсутствует."
+                (false, true) => UiText.Format($"Записан лимит {tweak.AppliedValue}%."),
+                (false, false) => UiText.Get("Этот лимит уже задан."),
+                (true, true) => UiText.Get("Исходная настройка восстановлена."),
+                _ => UiText.Get("Сохранённая настройка отсутствует.")
             });
         }
         catch (Exception ex) when (IsSystemError(ex))
@@ -145,7 +145,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            SetStatus(IndexExclusionStatus, $"Не удалось загрузить список исключений. {ex.Message}", error: true);
+            SetStatus(IndexExclusionStatus, UiText.Format($"Не удалось загрузить список исключений. {ex.Message}"), error: true);
         }
     }
 
@@ -159,7 +159,7 @@ public partial class MainWindow
 
     private async void AddIndexExclusionClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите папку для исключения из индексации" };
+        var dialog = new OpenFolderDialog { Title = UiText.Get("Выберите папку для исключения из индексации") };
         if (dialog.ShowDialog(this) == true)
             await ChangeIndexExclusionAsync(dialog.FolderName, restore: false);
     }
@@ -177,21 +177,21 @@ public partial class MainWindow
 
         workingWithIndexExclusions = true;
         UpdateIndexExclusionControls();
-        SetStatus(IndexExclusionStatus, "Обновляем правила индексации…");
+        SetStatus(IndexExclusionStatus, UiText.Get("Обновляем правила индексации…"));
         try
         {
             bool changed = await RunInBackground(() => SearchIndexExclusions.Change(folder, restore));
             SetStatus(IndexExclusionStatus, (restore, changed) switch
             {
-                (false, true) => $"Папка исключена из индексации: {folder}",
-                (false, false) => "Папка уже вне области индексации или для неё задано отдельное правило.",
-                (true, true) => $"Восстановлена исходная настройка для папки: {folder}",
-                _ => "Сохранённое исключение отсутствует."
+                (false, true) => UiText.Format($"Папка исключена из индексации: {folder}"),
+                (false, false) => UiText.Get("Папка уже вне области индексации или для неё задано отдельное правило."),
+                (true, true) => UiText.Format($"Восстановлена исходная настройка для папки: {folder}"),
+                _ => UiText.Get("Сохранённое исключение отсутствует.")
             });
         }
         catch (Exception ex) when (IsSystemError(ex))
         {
-            SetStatus(IndexExclusionStatus, $"Не удалось изменить правила индексации. {ex.Message}", error: true);
+            SetStatus(IndexExclusionStatus, UiText.Format($"Не удалось изменить правила индексации. {ex.Message}"), error: true);
         }
         finally
         {
@@ -230,7 +230,7 @@ public partial class MainWindow
         catch (Exception ex) when (IsSystemError(ex))
         {
             status.Visibility = Visibility.Visible;
-            SetStatus(status, $"Не удалось открыть инструмент Windows. {ex.Message}", error: true);
+            SetStatus(status, UiText.Format($"Не удалось открыть инструмент Windows. {ex.Message}"), error: true);
             status.BringIntoView();
         }
     }

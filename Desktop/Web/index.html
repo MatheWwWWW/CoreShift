@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CoreShift</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="board.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="backplane" aria-hidden="true"></div>
+  <header id="chrome">
+    <div class="wordmark" data-drag><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>Core<span>Shift</span></div>
+    <div class="command-strip" data-drag>
+      <button id="search-button" class="search-button" type="button"><span data-icon="search" aria-hidden="true"></span><span id="search-label"></span><kbd>Ctrl K</kbd></button>
+    </div>
+    <div class="chrome-actions">
+      <button id="assistant-button" class="icon-button" type="button"><span data-icon="assistant" aria-hidden="true"></span><span id="assistant-label"></span></button>
+      <button id="settings-button" class="icon-button" type="button"><span data-icon="settings" aria-hidden="true"></span></button>
+      <div class="window-buttons">
+        <button id="minimize" type="button" class="icon-button"><span class="window-min" aria-hidden="true"></span></button>
+        <button id="maximize" type="button" class="icon-button"><span class="window-max" aria-hidden="true"></span></button>
+        <button id="close" type="button" class="icon-button close"><span class="window-close" aria-hidden="true"></span></button>
+      </div>
+    </div>
+  </header>
+  <div class="workspace">
+    <aside id="rail"><nav id="navigation"></nav></aside>
+    <main id="workspace">
+      <div id="page" class="page">
+        <div id="update"></div>
+        <section id="overview" hidden>
+          <div class="page-heading">
+            <div><h1 id="overview-title"></h1><div class="overview-meta"><strong id="host"></strong><span id="windows"></span></div></div>
+            <div class="heading-actions"><button id="refresh" type="button" class="quiet"><span data-icon="refresh" aria-hidden="true"></span><span id="refresh-label"></span></button></div>
+          </div>
+          <div class="workbench">
+          <article class="board-card interactive">
+            <div class="board-heading">
+              <div><h2 id="board-title"></h2><p id="board-hint" class="hint"></p></div>
+              <div class="heading-actions"><button id="board-reset" type="button" class="quiet" hidden></button><button id="board-mode" type="button" class="mode-button"></button></div>
+            </div>
+            <div class="board-layout">
+              <div class="board-surface" id="board-surface">
+                <div id="board-plan" class="board-plan"></div>
+                <canvas id="board-model" hidden tabindex="0"></canvas>
+              </div>
+            </div>
+            <div class="part-reading">
+              <div><span id="part-label" class="hint"></span><strong id="part-name"></strong><p id="part-detail" class="hint"></p></div>
+              <div id="part-value" class="metric-number"></div>
+              <button id="part-details" type="button" class="quiet"></button>
+            </div>
+            <div id="board-drives" class="board-drives" hidden></div>
+          </article>
+          <section class="readouts" aria-labelledby="readout-title">
+            <header><h2 id="readout-title"></h2><span id="refresh-status" class="badge"></span></header>
+            <article class="metric-card interactive" data-meter="cpu"><div class="meter-heading"><span data-icon="hardware" aria-hidden="true"></span><span id="cpu-label"></span><strong id="cpu-value" class="metric-number">—</strong></div><canvas id="cpu-chart" class="history" aria-hidden="true"></canvas><span id="cpu-detail" class="hint"></span></article>
+            <article class="metric-card interactive" data-meter="ram"><div class="meter-heading"><span data-icon="memory" aria-hidden="true"></span><span id="ram-label"></span><strong id="ram-value" class="metric-number">—</strong></div><canvas id="ram-chart" class="history" aria-hidden="true"></canvas><span id="ram-detail" class="hint"></span></article>
+            <article class="metric-card interactive" data-meter="disk"><div class="meter-heading"><span data-icon="disk" aria-hidden="true"></span><span id="disk-label"></span><strong id="disk-value" class="metric-number">—</strong></div><progress id="disk-meter" max="100" value="0"></progress><span id="disk-detail" class="hint"></span></article>
+          </section>
+          </div>
+          <div id="overview-actions" class="page-actions">
+            <button id="focus" type="button"><span data-icon="focus" aria-hidden="true"></span><span id="focus-label"></span><span data-icon="arrow" aria-hidden="true"></span></button>
+            <button id="snapshots" type="button"><span data-icon="compare" aria-hidden="true"></span><span id="snapshots-label"></span><span data-icon="arrow" aria-hidden="true"></span></button>
+          </div>
+          <div id="overview-options"></div>
+        </section>
+        <section id="native-data" class="projected"></section>
+      </div>
+    </main>
+  </div>
+  <dialog id="settings" class="settings">
+    <header class="dialog-header"><h2 id="settings-title"></h2><button type="button" class="icon-button" id="settings-close"><span class="window-close" aria-hidden="true"></span></button></header>
+    <div class="settings-layout"><nav id="settings-tabs"></nav><div id="settings-body" class="projected"></div></div>
+  </dialog>
+  <dialog id="search" class="search-dialog">
+    <header class="dialog-header"><h2 id="search-title"></h2><button type="button" class="icon-button" id="search-close"><span class="window-close" aria-hidden="true"></span></button></header>
+    <input id="search-query" type="search" autocomplete="off">
+    <div id="search-results"></div>
+  </dialog>
+  <dialog id="confirmation" class="confirmation" aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
+    <header class="dialog-header"><h2 id="confirmation-title"></h2></header>
+    <p id="confirmation-message"></p>
+    <div class="confirmation-actions">
+      <button id="confirmation-cancel" type="button" autofocus></button>
+      <button id="confirmation-accept" class="primary" type="button"></button>
+    </div>
+  </dialog>
+</body>
+</html>

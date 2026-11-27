@@ -27,6 +27,9 @@ if (args is ["--performance"])
     CheckPagefileIncrease();
     CheckContextProfile();
     CheckContextProfileStopsOnSelectedExit();
+    CheckFocusProfilePhases();
+    CheckFocusProcessGroup();
+    CheckFocusMeasurements();
     return;
 }
 
@@ -42,6 +45,9 @@ CheckPagefileIncrease();
 CheckPagefileAdvice();
 CheckContextProfile();
 CheckContextProfileStopsOnSelectedExit();
+CheckFocusProfilePhases();
+CheckFocusProcessGroup();
+CheckFocusMeasurements();
 CheckProcessMemoryTrim();
 
 static void CheckTempCleanup()
@@ -403,8 +409,30 @@ static void CheckTweakRestore()
         policy.SetValue(limit.ValueName, 20);
         Require(TweaksEngine.Change(testHive, limit, "Backups", restore: true) && policy.GetValue(limit.ValueName) is 3,
             "Restore should recover when a limit change was interrupted before writing the new value.");
+        var diagnostics = TweaksEngine.DiagnosticData with { Key = tweak.Key, ValueName = "Diagnostics" };
+        using (var backups = testHive.OpenSubKey("Backups", writable: true)!)
+            backups.SetValue(diagnostics.Id, "absent");
+        policy.SetValue(diagnostics.ValueName, 0);
+        Require(TweaksEngine.Change(testHive, diagnostics with { AppliedValue = 1 }, "Backups", restore: false) &&
+            policy.GetValue(diagnostics.ValueName) is 1, "The new diagnostic picker should accept legacy backups.");
+        Require(TweaksEngine.Change(testHive, diagnostics with { AppliedValue = 3 }, "Backups", restore: false) &&
+            policy.GetValue(diagnostics.ValueName) is 3, "Changing the diagnostic level should retain its original value.");
+        Require(TweaksEngine.Change(testHive, diagnostics, "Backups", restore: true) &&
+            policy.GetValue(diagnostics.ValueName) is null, "Restoring diagnostics should recreate the state from before the legacy change.");
         Require(TweaksEngine.SupportIssue("telemetry", "Professional", new Version(10, 0, 22631)) is not null,
             "Telemetry level 0 should be restricted by edition.");
+        Require(TweaksEngine.SupportIssue("windows-spotlight", "Professional", new Version(10, 0, 22631)) is not null &&
+            TweaksEngine.SupportIssue("windows-spotlight", "EnterpriseS", new Version(10, 0, 22631)) is null,
+            "Spotlight should only be disabled through the policy on supported enterprise editions.");
+        Require(TweaksEngine.SupportIssue("diagnostic-dumps", "Professional", new Version(10, 0, 18362)) is not null &&
+            TweaksEngine.SupportIssue("diagnostic-dumps", "Professional", new Version(10, 0, 18363)) is null,
+            "The dump policy must respect the documented build for Group Policy.");
+        var appDiagnostics = TweaksEngine.DiagnosticPrivacyCatalog.Single(option => option.Id == "app-diagnostics") with { Key = tweak.Key };
+        policy.SetValue(appDiagnostics.ValueName, 1, RegistryValueKind.DWord);
+        Require(TweaksEngine.Change(testHive, appDiagnostics, "Backups", restore: false) && policy.GetValue(appDiagnostics.ValueName) is 2,
+            "App diagnostics should use the documented Force Deny policy value.");
+        Require(TweaksEngine.Change(testHive, appDiagnostics, "Backups", restore: true) && policy.GetValue(appDiagnostics.ValueName) is 1,
+            "Restoring app diagnostics should keep the original consent policy.");
         Require(TweaksEngine.SupportIssue("game-dvr", "Professional", new Version(10, 0, 22631)) is not null,
             "The Game DVR policy should be restricted to Windows 10.");
         Require(TweaksEngine.SupportIssue("notification-center", "Professional", new Version(10, 0, 19043, 1201)) is not null &&
@@ -416,6 +444,17 @@ static void CheckTweakRestore()
         Require(TweaksEngine.SupportIssue("search-highlights", "Professional", new Version(10, 0, 22000, 1760)) is not null &&
             TweaksEngine.SupportIssue("search-highlights", "Professional", new Version(10, 0, 22000, 1761)) is null,
             "The original Windows 11 release needs the Search Highlights update.");
+        foreach (var option in TweaksEngine.AppPrivacyCatalog.Concat(TweaksEngine.ExplorerCatalog).Concat(TweaksEngine.TaskbarCatalog))
+        {
+            var entry = option with { Key = tweak.Key };
+            Require(TweaksEngine.Change(testHive, entry, "Backups", restore: false) &&
+                Equals(policy.GetValue(entry.ValueName), entry.AppliedValue), $"Could not apply {entry.Id} in the test hive.");
+            Require(TweaksEngine.Change(testHive, entry, "Backups", restore: true) && policy.GetValue(entry.ValueName) is null,
+                $"Could not restore {entry.Id} in the test hive.");
+        }
+        Require(TweaksEngine.SupportIssue("hide-task-view", "Professional", new Version(10, 0, 22000)) is not null &&
+            TweaksEngine.SupportIssue("hide-task-view", "Professional", new Version(10, 0, 22621)) is null,
+            "Task View policy must respect the Windows 11 22H2 boundary.");
         Console.WriteLine("PASS registry apply, conflicts and restore");
     }
     finally
@@ -611,6 +650,125 @@ static void CheckContextProfileStopsOnSelectedExit()
         if (watching is { IsCompleted: false })
             watching.Wait(TimeSpan.FromSeconds(5));
     }
+}
+
+static void CheckFocusProfilePhases()
+{
+    using var child = StartIdleChild();
+    using var mutex = new Mutex();
+    using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+    using var baselineObserved = new ManualResetEventSlim();
+    int active = 0;
+    var original = child.PriorityClass;
+    var desired = original == ProcessPriorityClass.AboveNormal ? ProcessPriorityClass.BelowNormal : ProcessPriorityClass.AboveNormal;
+    var identity = new ContextProfileManager.SelectedProcess(child.Id, child.StartTime.ToUniversalTime());
+    var profile = new ContextProfileManager(child.ProcessName, desired, selected: identity);
+    var watch = Task.Run(() => profile.Watch(mutex, stop.Token, () => { }, _ => { },
+        applyProfile: () =>
+        {
+            if (Volatile.Read(ref active) != 0)
+                return true;
+            baselineObserved.Set();
+            return false;
+        }, followInBackground: true));
+    try
+    {
+        ProcessPriorityClass ReadPriority()
+        {
+            child.Refresh();
+            return child.PriorityClass;
+        }
+
+        Require(baselineObserved.Wait(3000) && ReadPriority() == original, "The baseline must leave the child priority untouched.");
+        Volatile.Write(ref active, 1);
+        Require(SpinWait.SpinUntil(() => ReadPriority() == desired, 3000), "The optimized phase must apply the priority.");
+        stop.Cancel();
+        Require(watch.Wait(3000) && watch.Result.Restored && ReadPriority() == original,
+            "Ending the optimized phase must restore the original priority.");
+        Console.WriteLine("PASS baseline/optimized priority gate and rollback");
+    }
+    finally
+    {
+        stop.Cancel();
+        if (!watch.IsCompleted)
+            watch.Wait(3000);
+        if (!child.HasExited)
+            child.Kill();
+    }
+}
+
+static void CheckFocusProcessGroup()
+{
+    using var first = StartIdleChild();
+    using var second = StartIdleChild();
+    using var unselected = StartIdleChild();
+    using var mutex = new Mutex();
+    using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+    second.PriorityClass = ProcessPriorityClass.BelowNormal;
+    var originalSecond = second.PriorityClass;
+    var originalUnselected = unselected.PriorityClass;
+    var priority = ProcessPriorityClass.AboveNormal;
+    var group = new ContextProfileManager(
+        [new(first.Id, first.StartTime.ToUniversalTime()), new(second.Id, second.StartTime.ToUniversalTime())], priority);
+    var updates = new System.Collections.Concurrent.ConcurrentQueue<ContextProfileManager.PriorityUpdate>();
+    var watch = Task.Run(() => group.Watch(mutex, stop.Token, () => { }, _ => { }, followInBackground: true, priorityChanged: updates.Enqueue));
+    try
+    {
+        ProcessPriorityClass ReadPriority(Process process)
+        {
+            process.Refresh();
+            return process.PriorityClass;
+        }
+
+        Require(SpinWait.SpinUntil(() => ReadPriority(first) == priority && ReadPriority(second) == priority, 3000),
+            "The priority must apply to both selected process identities.");
+        Require(ReadPriority(unselected) == originalUnselected, "An unselected instance must retain its original priority.");
+        Require(SpinWait.SpinUntil(() => updates.Count(update => update.State == ContextProfileManager.PriorityState.Applied) == 2, 1000),
+            "The UI must receive confirmation for both applied priorities.");
+
+        first.StandardInput.Close();
+        Require(first.WaitForExit(3000), "The first selected process must exit.");
+        Thread.Sleep(350);
+        Require(!watch.IsCompleted && ReadPriority(second) == priority, "The remaining selected process must stay in the profile.");
+
+        stop.Cancel();
+        Require(watch.Wait(3000) && watch.Result.Restored && ReadPriority(second) == originalSecond,
+            "Stopping must restore the surviving process.");
+        Require(updates.Any(update => update.ProcessId == first.Id && update.State == ContextProfileManager.PriorityState.Exited) &&
+            updates.Any(update => update.ProcessId == second.Id && update.State == ContextProfileManager.PriorityState.Restored),
+            "The UI must distinguish a process exit from restored priority.");
+        Console.WriteLine("PASS focus process group selection, survivor and rollback");
+    }
+    finally
+    {
+        stop.Cancel();
+        if (!watch.IsCompleted)
+            watch.Wait(3000);
+        foreach (var child in new[] { first, second, unselected })
+        {
+            if (!child.HasExited)
+                child.Kill();
+        }
+    }
+}
+
+static void CheckFocusMeasurements()
+{
+    var phase = new FocusPhaseMeasurement(4);
+    long Tick(int seconds) => seconds * Stopwatch.Frequency;
+    FocusObservation Sample(int seconds, double cpu, long ram, ulong headroom) =>
+        new(Tick(seconds), TimeSpan.FromSeconds(cpu), ram, headroom);
+
+    phase.Observe(Sample(0, 0, 100, 1000));
+    phase.Observe(Sample(1, 2, 300, 700));
+    phase.Observe(null);
+    phase.Observe(Sample(6, 10, 200, 850));
+    phase.Observe(Sample(7, 11, 400, 800));
+    phase.Observe(Sample(12, 15, 2000, 100));
+    var result = phase.ReadResult();
+    Require(result is { Seconds: 2, Intervals: 2, CpuPercent: 37.5, AverageWorkingSet: 250, PeakWorkingSet: 400,
+        MinimumCommitHeadroom: 700 }, "Focus metrics must exclude paused time and overdue samples, normalize CPU, and calculate memory statistics.");
+    Console.WriteLine("PASS focus phase measurements and pause handling");
 }
 
 static Process StartIdleChild()
